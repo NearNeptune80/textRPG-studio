@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ThemeFile, DEFAULT_DARK_FANTASY_THEME } from "./types/theme";
-import { LayoutFile, DEFAULT_LAYOUT, GameSimulationState } from "./types/layout";
+import { LayoutFile, BLANK_LAYOUT, GameSimulationState } from "./types/layout";
 import { CustomWidgetDefinition, PREMADE_WIDGETS } from "./types/elements";
 import { ThemeEditor } from "./components/ThemeEditor";
 import { LayoutEditor } from "./components/LayoutEditor";
@@ -11,7 +11,7 @@ type ActiveTab = "THEME" | "LAYOUT";
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<ThemeFile>(DEFAULT_DARK_FANTASY_THEME);
-  const [layout, setLayout] = useState<LayoutFile>(DEFAULT_LAYOUT);
+  const [layout, setLayout] = useState<LayoutFile>(BLANK_LAYOUT);
   const [availableWidgets, setAvailableWidgets] = useState<CustomWidgetDefinition[]>(PREMADE_WIDGETS);
   const [activeTab, setActiveTab] = useState<ActiveTab>("LAYOUT");
   const [activeSimulationState, setActiveSimulationState] = useState<GameSimulationState>("UNIVERSAL");
@@ -76,7 +76,7 @@ export const App: React.FC = () => {
           </div>
           <div>
             <h1 className="font-bold text-sm text-slate-100 tracking-wide">textRPG Studio</h1>
-            <p className="text-[11px] text-purple-400 font-medium">Modular Theme & Responsive Layout Designer</p>
+            <p className="text-[11px] text-purple-400 font-medium">Drag-and-Drop Theme & Modular Layout Designer</p>
           </div>
         </div>
 
@@ -144,7 +144,7 @@ export const App: React.FC = () => {
       {/* Main Workspace (Left Inspector + Right Live Mockup) */}
       <main className="flex-1 flex overflow-hidden p-4 gap-4">
         {/* Left Side: Active Editor */}
-        <section className="w-[450px] shrink-0 h-full flex flex-col">
+        <section className="w-[420px] shrink-0 h-full flex flex-col">
           {activeTab === "THEME" ? (
             <ThemeEditor theme={theme} onChange={setTheme} />
           ) : (
@@ -164,6 +164,7 @@ export const App: React.FC = () => {
           <GamePreviewViewport
             theme={theme}
             layout={layout}
+            onChangeLayout={setLayout}
             availableWidgets={availableWidgets}
             activeState={activeSimulationState}
             onSelectState={setActiveSimulationState}

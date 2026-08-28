@@ -202,7 +202,7 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
       return (
         <div className="w-full flex flex-col items-center">
           <div
-            className="grid grid-cols-7 gap-1 p-2 bg-black/40 border border-white/5 aspect-square w-full max-w-[200px]"
+            className="grid grid-cols-7 gap-1 p-2 bg-black/40 border border-white/5 w-full max-w-[210px]"
             style={{ borderRadius: radius }}
           >
             {Array.from({ length: 49 }).map((_, i) => {
@@ -211,7 +211,7 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
               return (
                 <div
                   key={i}
-                  className="flex items-center justify-center text-[10px] font-bold"
+                  className="aspect-square w-full flex items-center justify-center text-[10px] font-bold"
                   style={{
                     backgroundColor: isPlayer
                       ? colorToCss(colors.borderButton)
