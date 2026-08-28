@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { LayoutFile, GameSimulationState, BLANK_LAYOUT, PRESET_DEFAULT_POPULATED_LAYOUT } from "../types/layout";
 import { CustomWidgetDefinition } from "../types/elements";
-import { Plus, GripVertical, Layers, Sliders } from "lucide-react";
+import { Plus, GripVertical, Layers, Sliders, Columns, Rows } from "lucide-react";
 import { CustomWidgetBuilderModal } from "./CustomWidgetBuilderModal";
 
 interface LayoutEditorProps {
@@ -52,6 +52,11 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
     e.dataTransfer.effectAllowed = "copy";
   };
 
+  const handleContainerDragStart = (e: React.DragEvent, containerType: string) => {
+    e.dataTransfer.setData("layout-container", containerType);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
   const resetToBlank = () => {
     if (confirm("Reset layout to completely blank?")) {
       onChange(JSON.parse(JSON.stringify(BLANK_LAYOUT)));
@@ -67,23 +72,23 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
   return (
     <div className="h-full flex flex-col space-y-3 select-none overflow-hidden pr-1">
       {/* State Mode Switcher & Presets */}
-      <div className="bg-[#1c1a24] p-3.5 rounded-xl border border-white/10 space-y-2.5 shrink-0">
+      <div className="bg-[#1c1a24] p-3 rounded-xl border border-white/10 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-purple-400 font-semibold text-xs">
+          <div className="flex items-center gap-1.5 text-purple-400 font-semibold text-xs">
             <Sliders className="w-3.5 h-3.5" />
-            <span>State Layout Scope</span>
+            <span>State Scope</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs">
             <button
               onClick={resetToBlank}
-              className="px-2 py-1 rounded bg-black/40 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-white/5 transition text-[11px]"
+              className="px-2 py-0.5 rounded bg-black/40 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-white/5 transition text-[11px]"
               title="Clear all panels and start blank"
             >
               Clear Blank
             </button>
             <button
               onClick={loadDefaultPreset}
-              className="px-2 py-1 rounded bg-black/40 hover:bg-purple-950/40 text-slate-400 hover:text-purple-300 border border-white/5 transition text-[11px]"
+              className="px-2 py-0.5 rounded bg-black/40 hover:bg-purple-950/40 text-slate-400 hover:text-purple-300 border border-white/5 transition text-[11px]"
               title="Load Lilith layout preset"
             >
               Load Preset
@@ -126,10 +131,52 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
                   : "bg-purple-900/40 text-purple-300 border border-purple-500/30"
               }`}
             >
-              {stateOverride?.enabled ? "Override Active" : "+ Enable Override"}
+              {stateOverride?.enabled ? "Active" : "+ Enable"}
             </button>
           </div>
         )}
+      </div>
+
+      {/* Draggable Layout Boxes Section */}
+      <div className="bg-[#1c1a24] p-3 rounded-xl border border-white/10 space-y-2 shrink-0">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+            Empty Box Containers
+          </span>
+          <span className="text-[10px] text-purple-400">Drag onto screen</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {/* Draggable Middle Column Box */}
+          <div
+            draggable={true}
+            onDragStart={(e) => handleContainerDragStart(e, "MIDDLE_COLUMN")}
+            className="p-2 rounded-lg bg-black/40 border border-white/10 hover:border-purple-500/60 hover:bg-purple-950/20 cursor-grab active:cursor-grabbing transition group flex items-center gap-2"
+          >
+            <Columns className="w-4 h-4 text-purple-400 shrink-0" />
+            <div>
+              <div className="font-semibold text-xs text-slate-200 group-hover:text-purple-200">
+                + Column Box
+              </div>
+              <div className="text-[9px] text-slate-500">Drop between columns</div>
+            </div>
+          </div>
+
+          {/* Draggable Row Box */}
+          <div
+            draggable={true}
+            onDragStart={(e) => handleContainerDragStart(e, "ROW_BOX")}
+            className="p-2 rounded-lg bg-black/40 border border-white/10 hover:border-purple-500/60 hover:bg-purple-950/20 cursor-grab active:cursor-grabbing transition group flex items-center gap-2"
+          >
+            <Rows className="w-4 h-4 text-indigo-400 shrink-0" />
+            <div>
+              <div className="font-semibold text-xs text-slate-200 group-hover:text-indigo-200">
+                + Row Box
+              </div>
+              <div className="text-[9px] text-slate-500">Drop at top or bottom</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Widget Creator Button */}
@@ -140,7 +187,7 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
           </div>
           <div>
             <span className="font-semibold text-xs text-slate-100 block">Widget Composer</span>
-            <span className="text-[10px] text-purple-300">Build new custom modular widgets</span>
+            <span className="text-[10px] text-purple-300">Build custom modular widgets</span>
           </div>
         </div>
         <button
@@ -156,12 +203,12 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
       </div>
 
       {/* Scrollable Widget Library Drawer */}
-      <div className="flex-1 flex flex-col space-y-2 overflow-hidden bg-[#1c1a24] p-3.5 rounded-xl border border-white/10">
+      <div className="flex-1 flex flex-col space-y-2 overflow-hidden bg-[#1c1a24] p-3 rounded-xl border border-white/10 min-h-0">
         <div className="flex items-center justify-between shrink-0">
           <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
             Available Widgets ({availableWidgets.length})
           </span>
-          <span className="text-[10px] text-purple-400">Drag onto the game screen</span>
+          <span className="text-[10px] text-purple-400">Drag into any box</span>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
@@ -170,17 +217,17 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
               key={w.id}
               draggable={true}
               onDragStart={(e) => handleWidgetDragStart(e, w.id)}
-              className="p-3 rounded-xl bg-black/40 border border-white/10 hover:border-purple-500/60 hover:bg-purple-950/20 cursor-grab active:cursor-grabbing transition group shadow-sm flex flex-col space-y-1.5"
+              className="p-2.5 rounded-xl bg-black/40 border border-white/10 hover:border-purple-500/60 hover:bg-purple-950/20 cursor-grab active:cursor-grabbing transition group shadow-sm flex flex-col space-y-1"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <GripVertical className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 shrink-0" />
                   <span className="font-semibold text-xs text-slate-100 group-hover:text-purple-200">
                     {w.name}
                   </span>
                 </div>
                 <span
-                  className={`text-[9px] px-1.5 py-0.5 rounded font-mono uppercase ${
+                  className={`text-[9px] px-1.5 py-0.2 rounded font-mono uppercase ${
                     w.isPremade ? "bg-blue-950 text-blue-300" : "bg-purple-950 text-purple-300"
                   }`}
                 >
@@ -195,7 +242,7 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
                 {w.elements.map((el) => (
                   <span
                     key={el.id}
-                    className="text-[9px] px-1.5 py-0.5 rounded bg-black/50 border border-white/5 text-slate-400 font-mono"
+                    className="text-[9px] px-1.5 py-0.2 rounded bg-black/50 border border-white/5 text-slate-400 font-mono"
                   >
                     {el.label || el.type}
                   </span>
