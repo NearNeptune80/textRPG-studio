@@ -64,30 +64,30 @@ export const BLANK_LAYOUT: LayoutFile = {
  * Default Populated Lilith textRPG Preset
  */
 export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
-  layoutName: "Default Lilith RPG Layout",
+  layoutName: "Lilith's Throne Complete Master Layout",
   margin: 6.0,
   rootNode: {
     id: "root_column",
     type: "CONTAINER",
     direction: "COLUMN",
-    sizes: [8, 72, 20],
+    sizes: [6.0, 72.0, 22.0],
     children: [
       {
-        id: "top_bar",
+        id: "top_bar_box",
         type: "LEAF",
         name: "Top Status Bar",
         widgets: ["widget_top_bar_full"],
       },
       {
-        id: "middle_row",
+        id: "middle_row_container",
         type: "CONTAINER",
         direction: "ROW",
-        sizes: [25, 50, 25],
+        sizes: [22.0, 56.0, 22.0],
         children: [
           {
-            id: "left_sidebar",
+            id: "left_sidebar_box",
             type: "LEAF",
-            name: "Left Sidebar",
+            name: "Character Bio & Vitals",
             widgets: [
               "widget_char_overview",
               "widget_vitals_gauges",
@@ -96,30 +96,371 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
             ],
           },
           {
-            id: "center_story",
+            id: "center_narrative_box",
             type: "LEAF",
-            name: "Center Story & Narrative",
-            widgets: [
-              "widget_narrative_story",
-              "widget_erotic_encounter",
-              "widget_tactical_combat",
-              "widget_inventory_dual",
-            ],
+            name: "Story Narrative & Scene",
+            widgets: ["widget_narrative_story"],
           },
           {
-            id: "right_sidebar",
+            id: "right_sidebar_box",
             type: "LEAF",
-            name: "Right World & Radar",
-            widgets: ["widget_minimap_radar"],
+            name: "World Radar & Target",
+            widgets: [
+              "widget_minimap_radar",
+              "widget_target_inspector",
+            ],
           },
         ],
       },
       {
-        id: "bottom_actions",
+        id: "bottom_actions_box",
         type: "LEAF",
-        name: "Bottom Action Commands",
+        name: "Action Commands Grid",
         widgets: ["widget_action_commands"],
       },
     ],
+  },
+  stateOverrides: {
+    COMBAT: {
+      enabled: true,
+      rootNode: {
+        id: "combat_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [6.0, 72.0, 22.0],
+        children: [
+          {
+            id: "combat_top_bar",
+            type: "LEAF",
+            name: "Top Status Bar",
+            widgets: ["widget_top_bar_full"],
+          },
+          {
+            id: "combat_middle_row",
+            type: "CONTAINER",
+            direction: "ROW",
+            sizes: [22.0, 56.0, 22.0],
+            children: [
+              {
+                id: "combat_left_sidebar",
+                type: "LEAF",
+                name: "Player Vitals",
+                widgets: [
+                  "widget_char_overview",
+                  "widget_vitals_gauges",
+                  "widget_attributes_table",
+                ],
+              },
+              {
+                id: "combat_center_arena",
+                type: "LEAF",
+                name: "Combat Arena",
+                widgets: ["widget_tactical_combat"],
+              },
+              {
+                id: "combat_right_target",
+                type: "LEAF",
+                name: "Target Status",
+                widgets: [
+                  "widget_target_inspector",
+                  "widget_minimap_radar",
+                ],
+              },
+            ],
+          },
+          {
+            id: "combat_bottom_actions",
+            type: "LEAF",
+            name: "Combat Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    INVENTORY: {
+      enabled: true,
+      rootNode: {
+        id: "inv_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [6.0, 72.0, 22.0],
+        children: [
+          {
+            id: "inv_top_bar",
+            type: "LEAF",
+            name: "Top Status Bar",
+            widgets: ["widget_top_bar_full"],
+          },
+          {
+            id: "inv_middle_row",
+            type: "CONTAINER",
+            direction: "ROW",
+            sizes: [32.0, 36.0, 32.0],
+            children: [
+              {
+                id: "inv_backpack_pane",
+                type: "LEAF",
+                name: "Backpack & Storage",
+                widgets: [
+                  "widget_inventory_filters",
+                  "widget_inventory_dual",
+                ],
+              },
+              {
+                id: "inv_paperdoll_pane",
+                type: "LEAF",
+                name: "Equipment Paperdoll",
+                widgets: ["widget_paperdoll_equipment"],
+              },
+              {
+                id: "inv_inspector_pane",
+                type: "LEAF",
+                name: "Item Details & Lore",
+                widgets: ["widget_item_details_inspector"],
+              },
+            ],
+          },
+          {
+            id: "inv_bottom_actions",
+            type: "LEAF",
+            name: "Inventory Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    SEX: {
+      enabled: true,
+      rootNode: {
+        id: "sex_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [6.0, 72.0, 22.0],
+        children: [
+          {
+            id: "sex_top_bar",
+            type: "LEAF",
+            name: "Top Status Bar",
+            widgets: ["widget_top_bar_full"],
+          },
+          {
+            id: "sex_middle_row",
+            type: "CONTAINER",
+            direction: "ROW",
+            sizes: [24.0, 52.0, 24.0],
+            children: [
+              {
+                id: "sex_left_sheet",
+                type: "LEAF",
+                name: "Player Anatomy & Fluids",
+                widgets: [
+                  "widget_char_overview",
+                  "widget_vitals_gauges",
+                  "widget_anatomy_fluids",
+                ],
+              },
+              {
+                id: "sex_center_encounter",
+                type: "LEAF",
+                name: "Erotic Encounter Log",
+                widgets: ["widget_erotic_encounter"],
+              },
+              {
+                id: "sex_right_target",
+                type: "LEAF",
+                name: "Partner Inspector",
+                widgets: ["widget_target_inspector"],
+              },
+            ],
+          },
+          {
+            id: "sex_bottom_actions",
+            type: "LEAF",
+            name: "Sex Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    SHOP: {
+      enabled: true,
+      rootNode: {
+        id: "shop_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [6.0, 72.0, 22.0],
+        children: [
+          {
+            id: "shop_top_bar",
+            type: "LEAF",
+            name: "Top Status Bar",
+            widgets: ["widget_top_bar_full"],
+          },
+          {
+            id: "shop_middle_row",
+            type: "CONTAINER",
+            direction: "ROW",
+            sizes: [36.0, 36.0, 28.0],
+            children: [
+              {
+                id: "shop_merchant_pane",
+                type: "LEAF",
+                name: "Merchant Catalog",
+                widgets: [
+                  "widget_merchant_dialog",
+                  "widget_merchant_catalog",
+                ],
+              },
+              {
+                id: "shop_player_pane",
+                type: "LEAF",
+                name: "Player Goods",
+                widgets: ["widget_player_sell_grid"],
+              },
+              {
+                id: "shop_cart_pane",
+                type: "LEAF",
+                name: "Transaction Cart",
+                widgets: ["widget_transaction_cart"],
+              },
+            ],
+          },
+          {
+            id: "shop_bottom_actions",
+            type: "LEAF",
+            name: "Shop Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    TRANSFORMATION: {
+      enabled: true,
+      rootNode: {
+        id: "tf_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [6.0, 72.0, 22.0],
+        children: [
+          {
+            id: "tf_top_bar",
+            type: "LEAF",
+            name: "Top Status Bar",
+            widgets: ["widget_top_bar_full"],
+          },
+          {
+            id: "tf_middle_row",
+            type: "CONTAINER",
+            direction: "ROW",
+            sizes: [28.0, 44.0, 28.0],
+            children: [
+              {
+                id: "tf_left_bio",
+                type: "LEAF",
+                name: "Character & Blessings",
+                widgets: [
+                  "widget_char_overview",
+                  "widget_active_enchantments_list",
+                ],
+              },
+              {
+                id: "tf_center_mutations",
+                type: "LEAF",
+                name: "Body Mutations Tree",
+                widgets: ["widget_body_mutations_tree"],
+              },
+              {
+                id: "tf_right_altar",
+                type: "LEAF",
+                name: "Runic Altar",
+                widgets: ["widget_enchanting_altar"],
+              },
+            ],
+          },
+          {
+            id: "tf_bottom_actions",
+            type: "LEAF",
+            name: "Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    SETTINGS: {
+      enabled: true,
+      rootNode: {
+        id: "opt_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [6.0, 72.0, 22.0],
+        children: [
+          {
+            id: "opt_top_bar",
+            type: "LEAF",
+            name: "Top Status Bar",
+            widgets: ["widget_top_bar_full"],
+          },
+          {
+            id: "opt_middle_row",
+            type: "CONTAINER",
+            direction: "ROW",
+            sizes: [34.0, 33.0, 33.0],
+            children: [
+              {
+                id: "opt_content_pane",
+                type: "LEAF",
+                name: "Content Toggles",
+                widgets: ["widget_options_content"],
+              },
+              {
+                id: "opt_demo_pane",
+                type: "LEAF",
+                name: "Demographics",
+                widgets: ["widget_options_demographics"],
+              },
+              {
+                id: "opt_display_pane",
+                type: "LEAF",
+                name: "Display & Audio",
+                widgets: ["widget_options_display_audio"],
+              },
+            ],
+          },
+          {
+            id: "opt_bottom_actions",
+            type: "LEAF",
+            name: "Settings Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    MAIN_MENU: {
+      enabled: true,
+      rootNode: {
+        id: "mm_root_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [78.0, 22.0],
+        children: [
+          {
+            id: "mm_center_hero",
+            type: "LEAF",
+            name: "Main Menu Hero & Profiles",
+            widgets: [
+              "widget_main_menu_hero",
+              "widget_main_menu_actions",
+              "widget_save_slot_list",
+            ],
+          },
+          {
+            id: "mm_bottom_actions",
+            type: "LEAF",
+            name: "Menu Actions",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
   },
 };
