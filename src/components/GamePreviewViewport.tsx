@@ -131,36 +131,48 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     setActiveSplitZone(null);
   };
 
+  // Tree Helper: Find Node by ID
+  const findNodeById = (current: LayoutNode, targetId: string): LayoutNode | null => {
+    if (current.id === targetId) return current;
+    if (current.type === "CONTAINER" && current.children) {
+      for (const child of current.children) {
+        const found = findNodeById(child, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   // Local 2-Box Splitter Resizing
   const startResizeLocalSplitter = (
     containerId: string,
     childIndex: number,
     direction: ContainerDirection,
-    containerElement: HTMLElement
+    containerElement: HTMLElement,
+    e: React.MouseEvent
   ) => {
-    const parentContainer = findParentContainer(rootNode, containerId)?.parentNode ||
-      (rootNode.id === containerId ? rootNode : null);
-    if (!parentContainer || !parentContainer.sizes || !parentContainer.children) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const targetContainer = findNodeById(rootNode, containerId);
+    if (!targetContainer || !targetContainer.sizes || !targetContainer.children) return;
 
     const rect = containerElement.getBoundingClientRect();
     const totalPixels = direction === "ROW" ? rect.width : rect.height;
     if (totalPixels <= 0) return;
 
-    const startSizes = [...parentContainer.sizes];
+    const startSizes = [...targetContainer.sizes];
+    if (childIndex < 0 || childIndex >= startSizes.length - 1) return;
+
     const initialSizeA = startSizes[childIndex];
     const initialSizeB = startSizes[childIndex + 1];
     const combinedSize = initialSizeA + initialSizeB;
 
-    let initialMousePos: number | null = null;
+    const startMousePos = direction === "ROW" ? e.clientX : e.clientY;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const currentPos = direction === "ROW" ? moveEvent.clientX : moveEvent.clientY;
-      if (initialMousePos === null) {
-        initialMousePos = currentPos;
-        return;
-      }
-
-      const pixelDelta = currentPos - initialMousePos;
+      const pixelDelta = currentPos - startMousePos;
       const percentDelta = (pixelDelta / totalPixels) * 100;
 
       const minSize = 5;
@@ -417,7 +429,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                     onMouseDown={(e) => {
                       const parent = e.currentTarget.parentElement;
                       if (parent) {
-                        startResizeLocalSplitter(node.id, idx, node.direction || "ROW", parent);
+                        startResizeLocalSplitter(node.id, idx, node.direction || "ROW", parent, e);
                       }
                     }}
                     className={`shrink-0 transition-colors z-20 ${
