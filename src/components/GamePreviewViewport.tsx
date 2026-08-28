@@ -781,27 +781,29 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
         </div>
       </div>
 
-      {/* Main Canvas Viewport Area with Non-Shifting Canvas */}
-      <div className="flex-1 min-h-0 overflow-hidden relative flex items-center justify-center p-1">
-        {/* Snapped Game Canvas (Strictly locked in place & aspect ratio) */}
-        <div
-          className={`w-full h-full rounded-xl overflow-hidden border shadow-2xl relative transition-all p-2 flex flex-col ${
-            resolution === "ULTRAWIDE" ? "aspect-[21/9]" : "aspect-[16/9]"
-          }`}
-          style={{
-            backgroundColor: colorToCss(colors.bgDark),
-            borderColor: colorToCss(colors.borderNormal),
-            borderWidth: borderW,
-            maxHeight: "100%",
-            maxWidth: "100%",
-          }}
-        >
-          {renderLayoutNode(rootNode)}
+      {/* Main Canvas Viewport Area with Non-Covering Docked Inspector */}
+      <div className="flex-1 min-h-0 overflow-hidden flex gap-3 p-1">
+        {/* Responsive Aspect-Ratio-Preserving Game Canvas (Never covered by menus) */}
+        <div className="flex-1 h-full min-h-0 min-w-0 flex items-center justify-center">
+          <div
+            className={`w-full h-full rounded-xl overflow-hidden border shadow-2xl relative transition-all p-2 flex flex-col ${
+              resolution === "ULTRAWIDE" ? "aspect-[21/9]" : "aspect-[16/9]"
+            }`}
+            style={{
+              backgroundColor: colorToCss(colors.bgDark),
+              borderColor: colorToCss(colors.borderNormal),
+              borderWidth: borderW,
+              maxHeight: "100%",
+              maxWidth: "100%",
+            }}
+          >
+            {renderLayoutNode(rootNode)}
+          </div>
         </div>
 
-        {/* Floating Overlay Box Options Drawer (Overlays cleanly without pushing or shifting the game canvas) */}
+        {/* Side-Docked Box Options Inspector (Never covers or overlaps any box on the canvas) */}
         {selectedNode && (
-          <div className="absolute top-4 right-4 bottom-4 w-80 bg-[#1c1a24]/95 backdrop-blur-md rounded-xl border border-purple-500/50 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto z-50 animate-in slide-in-from-right-4 duration-200">
+          <div className="w-80 bg-[#1c1a24] rounded-xl border border-purple-500/40 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto shrink-0 animate-in slide-in-from-right-4 duration-200">
             {/* Popover Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center gap-2">
