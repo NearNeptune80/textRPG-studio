@@ -102,68 +102,101 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     return [];
   };
 
-  // Mathematical Equalization of any 2 arbitrary boxes anywhere in the tree
-  const matchSizesOfTwoBoxes = (root: LayoutNode, idA: string, idB: string, dimension: "WIDTH" | "HEIGHT"): LayoutNode => {
-    const findLCA = (node: LayoutNode): { lcaNode: LayoutNode; isAInLeft: boolean } | null => {
-      if (node.type !== "SPLIT" || !node.children) return null;
-      const aIn0 = containsNode(node.children[0], idA);
-      const aIn1 = containsNode(node.children[1], idA);
-      const bIn0 = containsNode(node.children[0], idB);
-      const bIn1 = containsNode(node.children[1], idB);
+  // Calculate effective fractional width and height of a node
+  const getNodeEffectiveFraction = (root: LayoutNode, targetId: string): { widthFraction: number; heightFraction: number } => {
+    let wf = 1.0;
+    let hf = 1.0;
 
-      if ((aIn0 && bIn1) || (aIn1 && bIn0)) {
-        return { lcaNode: node, isAInLeft: aIn0 };
-      }
-      if (aIn0 && bIn0) return findLCA(node.children[0]);
-      if (aIn1 && bIn1) return findLCA(node.children[1]);
-      return null;
-    };
-
-    const getSubtreeFactor = (node: LayoutNode, targetId: string, dim: "WIDTH" | "HEIGHT"): number => {
-      if (node.id === targetId) return 1.0;
+    const traverse = (node: LayoutNode) => {
+      if (node.id === targetId) return;
       if (node.type === "SPLIT" && node.children) {
-        const isRelevantDir = (dim === "WIDTH" && node.direction === "HORIZONTAL") ||
-                              (dim === "HEIGHT" && node.direction === "VERTICAL");
         const r = node.splitRatio ?? 0.5;
         if (containsNode(node.children[0], targetId)) {
-          const factor = isRelevantDir ? r : 1.0;
-          return factor * getSubtreeFactor(node.children[0], targetId, dim);
-        }
-        if (containsNode(node.children[1], targetId)) {
-          const factor = isRelevantDir ? (1.0 - r) : 1.0;
-          return factor * getSubtreeFactor(node.children[1], targetId, dim);
+          if (node.direction === "HORIZONTAL") wf *= r;
+          if (node.direction === "VERTICAL") hf *= r;
+          traverse(node.children[0]);
+        } else if (containsNode(node.children[1], targetId)) {
+          if (node.direction === "HORIZONTAL") wf *= (1.0 - r);
+          if (node.direction === "VERTICAL") hf *= (1.0 - r);
+          traverse(node.children[1]);
         }
       }
-      return 1.0;
     };
 
-    const lcaInfo = findLCA(root);
-    if (!lcaInfo) return root;
+    traverse(root);
+    return { widthFraction: wf, heightFraction: hf };
+  };
 
-    const { lcaNode, isAInLeft } = lcaInfo;
-    const childLeft = lcaNode.children![0];
-    const childRight = lcaNode.children![1];
+  // Find the immediate directional split ancestor of Box 2 that controls its dimension
+  const findDirectionalAncestorSplit = (
+    root: LayoutNode,
+    targetId: string,
+    requiredDir: SplitDirection
+  ): { splitNodeId: string; isChild0: boolean; availableFraction: number } | null => {
+    let result: { splitNodeId: string; isChild0: boolean; availableFraction: number } | null = null;
+    let currentAvail = 1.0;
 
-    const nodeLeftTarget = isAInLeft ? idA : idB;
-    const nodeRightTarget = isAInLeft ? idB : idA;
+    const traverse = (node: LayoutNode) => {
+      if (node.id === targetId) return;
+      if (node.type === "SPLIT" && node.children) {
+        const isReq = node.direction === requiredDir;
+        const r = node.splitRatio ?? 0.5;
 
-    const kLeft = getSubtreeFactor(childLeft, nodeLeftTarget, dimension);
-    const kRight = getSubtreeFactor(childRight, nodeRightTarget, dimension);
+        if (containsNode(node.children[0], targetId)) {
+          if (isReq) {
+            result = { splitNodeId: node.id, isChild0: true, availableFraction: currentAvail };
+            currentAvail *= r;
+          }
+          traverse(node.children[0]);
+        } else if (containsNode(node.children[1], targetId)) {
+          if (isReq) {
+            result = { splitNodeId: node.id, isChild0: false, availableFraction: currentAvail };
+            currentAvail *= (1.0 - r);
+          }
+          traverse(node.children[1]);
+        }
+      }
+    };
 
-    // Solve for r such that: r * kLeft = (1 - r) * kRight
-    // => r = kRight / (kLeft + kRight)
-    let desiredRatio = kRight / (kLeft + kRight);
-    // Guardrails to prevent collapse: clamp between 0.05 and 0.95
-    desiredRatio = Math.max(0.05, Math.min(0.95, Math.round(desiredRatio * 1000) / 1000));
+    traverse(root);
+    return result;
+  };
 
-    return updateNodeInTree(root, lcaNode.id, (n) => ({
+  // Apply Dimension of Box 1 (reference) onto Box 2 (target)
+  const applySizeOfFirstToSecond = (
+    root: LayoutNode,
+    idFirst: string,
+    idSecond: string,
+    dimension: "WIDTH" | "HEIGHT"
+  ): LayoutNode => {
+    const requiredDir: SplitDirection = dimension === "WIDTH" ? "HORIZONTAL" : "VERTICAL";
+
+    // 1. Get reference dimension from Box 1
+    const refFractions = getNodeEffectiveFraction(root, idFirst);
+    const targetSize = dimension === "WIDTH" ? refFractions.widthFraction : refFractions.heightFraction;
+
+    // 2. Find controlling ancestor split for Box 2
+    const targetAncestor = findDirectionalAncestorSplit(root, idSecond, requiredDir);
+    if (!targetAncestor) return root;
+
+    const { splitNodeId, isChild0, availableFraction } = targetAncestor;
+    if (availableFraction <= 0.001) return root;
+
+    // 3. Compute new ratio strictly for that direction
+    const desiredFractionInParent = targetSize / availableFraction;
+    let newRatio = isChild0 ? desiredFractionInParent : 1.0 - desiredFractionInParent;
+
+    // 4. Guardrails: clamp between 0.05 and 0.95
+    newRatio = Math.max(0.05, Math.min(0.95, Math.round(newRatio * 1000) / 1000));
+
+    return updateNodeInTree(root, splitNodeId, (n) => ({
       ...n,
-      splitRatio: desiredRatio,
+      splitRatio: newRatio,
     }));
   };
 
-  const handleMakeBoxesEqual = (idA: string, idB: string, dim: "WIDTH" | "HEIGHT") => {
-    updateRootNode(matchSizesOfTwoBoxes(rootNode, idA, idB, dim));
+  const handleMakeBoxesEqual = (idReference: string, idTarget: string, dim: "WIDTH" | "HEIGHT") => {
+    updateRootNode(applySizeOfFirstToSecond(rootNode, idReference, idTarget, dim));
   };
 
   // Find Parent Split Node
@@ -767,22 +800,32 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
               {secondaryNode && (
                 <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between text-[11px] bg-purple-950/40 p-2 rounded border border-purple-500/20 text-purple-200">
-                    <span>Comparing:</span>
-                    <span className="font-semibold">{selectedNode.id} ↔ {secondaryNode.id}</span>
+                  <div className="flex flex-col gap-1 text-[11px] bg-purple-950/40 p-2.5 rounded-lg border border-purple-500/20 text-purple-200">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">1. Reference:</span>
+                      <span className="font-semibold text-purple-300">{selectedNode.name || selectedNode.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">2. Target to Resize:</span>
+                      <span className="font-semibold text-amber-300">{secondaryNode.name || secondaryNode.id}</span>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "WIDTH")}
-                      className="py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition text-center"
+                      className="py-2 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition text-center flex flex-col items-center justify-center leading-tight"
+                      title="Make Target Box take the exact width of Reference Box"
                     >
-                      Make Equal Width
+                      <span>Match Width</span>
+                      <span className="text-[10px] text-purple-200 font-normal">(Heights untouched)</span>
                     </button>
                     <button
                       onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "HEIGHT")}
-                      className="py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition text-center"
+                      className="py-2 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition text-center flex flex-col items-center justify-center leading-tight"
+                      title="Make Target Box take the exact height of Reference Box"
                     >
-                      Make Equal Height
+                      <span>Match Height</span>
+                      <span className="text-[10px] text-indigo-200 font-normal">(Widths untouched)</span>
                     </button>
                   </div>
                 </div>
