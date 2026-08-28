@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { LayoutFile, GameSimulationState, BLANK_LAYOUT, PRESET_DEFAULT_POPULATED_LAYOUT } from "../types/layout";
 import { CustomWidgetDefinition } from "../types/elements";
-import { Plus, GripVertical, Layers, Sliders, Columns, Rows } from "lucide-react";
+import { Plus, GripVertical, Layers, Sliders, Box } from "lucide-react";
 import { CustomWidgetBuilderModal } from "./CustomWidgetBuilderModal";
 
 interface LayoutEditorProps {
@@ -52,8 +52,8 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
     e.dataTransfer.effectAllowed = "copy";
   };
 
-  const handleContainerDragStart = (e: React.DragEvent, containerType: string) => {
-    e.dataTransfer.setData("layout-container", containerType);
+  const handleBoxDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("layout-container", "EMPTY_BOX");
     e.dataTransfer.effectAllowed = "copy";
   };
 
@@ -137,45 +137,32 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
         )}
       </div>
 
-      {/* Draggable Layout Boxes Section */}
+      {/* Draggable Freeform Box Creator */}
       <div className="bg-[#1c1a24] p-3 rounded-xl border border-white/10 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-            Empty Box Containers
+            Layout Box Tool
           </span>
-          <span className="text-[10px] text-purple-400">Drag onto screen</span>
+          <span className="text-[10px] text-purple-400">Drag onto canvas</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {/* Draggable Middle Column Box */}
-          <div
-            draggable={true}
-            onDragStart={(e) => handleContainerDragStart(e, "MIDDLE_COLUMN")}
-            className="p-2 rounded-lg bg-black/40 border border-white/10 hover:border-purple-500/60 hover:bg-purple-950/20 cursor-grab active:cursor-grabbing transition group flex items-center gap-2"
-          >
-            <Columns className="w-4 h-4 text-purple-400 shrink-0" />
+        <div
+          draggable={true}
+          onDragStart={handleBoxDragStart}
+          className="p-3 rounded-xl bg-black/40 border border-white/10 hover:border-purple-500/70 hover:bg-purple-950/30 cursor-grab active:cursor-grabbing transition group flex items-center justify-between shadow-sm"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300 group-hover:scale-105 transition">
+              <Box className="w-4 h-4" />
+            </div>
             <div>
-              <div className="font-semibold text-xs text-slate-200 group-hover:text-purple-200">
-                + Column Box
+              <div className="font-semibold text-xs text-slate-100 group-hover:text-purple-200">
+                + Empty Box
               </div>
-              <div className="text-[9px] text-slate-500">Drop between columns</div>
+              <div className="text-[10px] text-slate-400">Drag & drop anywhere on canvas</div>
             </div>
           </div>
-
-          {/* Draggable Row Box */}
-          <div
-            draggable={true}
-            onDragStart={(e) => handleContainerDragStart(e, "ROW_BOX")}
-            className="p-2 rounded-lg bg-black/40 border border-white/10 hover:border-purple-500/60 hover:bg-purple-950/20 cursor-grab active:cursor-grabbing transition group flex items-center gap-2"
-          >
-            <Rows className="w-4 h-4 text-indigo-400 shrink-0" />
-            <div>
-              <div className="font-semibold text-xs text-slate-200 group-hover:text-indigo-200">
-                + Row Box
-              </div>
-              <div className="text-[9px] text-slate-500">Drop at top or bottom</div>
-            </div>
-          </div>
+          <GripVertical className="w-4 h-4 text-slate-600 group-hover:text-purple-400 shrink-0" />
         </div>
       </div>
 

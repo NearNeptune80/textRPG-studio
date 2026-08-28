@@ -1,11 +1,3 @@
-export type PanelAnchorType =
-  | "TOP_BAR"
-  | "BOTTOM_BAR"
-  | "LEFT_SIDEBAR"
-  | "RIGHT_SIDEBAR"
-  | "CENTER_FLEX"
-  | "FLOATING_RECT";
-
 export type GameSimulationState =
   | "UNIVERSAL"
   | "EXPLORATION"
@@ -14,16 +6,18 @@ export type GameSimulationState =
   | "COMBAT"
   | "INVENTORY";
 
+/**
+ * 2D Responsive Freeform Panel Box.
+ * Positions and dimensions are stored in percentage (0 to 100%) so layouts
+ * adapt fluidly across any resolution (HD, FHD, 4K, Ultrawide).
+ */
 export interface PanelDefinition {
   id: string;
   name: string;
-  anchor: PanelAnchorType;
-  fixedWidth?: number;
-  fixedHeight?: number;
-  minWidth?: number;
-  maxWidth?: number;
-  backgroundColor?: string;
-  borderColor?: string;
+  x: number;      // % (0 to 100)
+  y: number;      // % (0 to 100)
+  width: number;  // % (0 to 100)
+  height: number; // % (0 to 100)
   layoutDirection?: "VERTICAL" | "HORIZONTAL";
   gap?: number;
   padding?: number;
@@ -43,71 +37,7 @@ export interface LayoutFile {
 export const BLANK_LAYOUT: LayoutFile = {
   layoutName: "Custom Blank Layout",
   margin: 6.0,
-  panels: [
-    {
-      id: "top_bar",
-      name: "Top Status Bar",
-      anchor: "TOP_BAR",
-      fixedHeight: 38.0,
-      backgroundColor: "bgHeader",
-      borderColor: "borderNormal",
-      layoutDirection: "HORIZONTAL",
-      gap: 8,
-      padding: 6,
-      widgets: [],
-    },
-    {
-      id: "left_pane",
-      name: "Left Sidebar",
-      anchor: "LEFT_SIDEBAR",
-      fixedWidth: 320.0,
-      minWidth: 240.0,
-      maxWidth: 480.0,
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
-      layoutDirection: "VERTICAL",
-      gap: 6,
-      padding: 6,
-      widgets: [],
-    },
-    {
-      id: "center_pane",
-      name: "Center Story & Narrative",
-      anchor: "CENTER_FLEX",
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
-      layoutDirection: "VERTICAL",
-      gap: 8,
-      padding: 8,
-      widgets: [],
-    },
-    {
-      id: "right_pane",
-      name: "Right World & Radar",
-      anchor: "RIGHT_SIDEBAR",
-      fixedWidth: 300.0,
-      minWidth: 220.0,
-      maxWidth: 450.0,
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
-      layoutDirection: "VERTICAL",
-      gap: 6,
-      padding: 6,
-      widgets: [],
-    },
-    {
-      id: "bottom_action_grid",
-      name: "Bottom Action Commands",
-      anchor: "BOTTOM_BAR",
-      fixedHeight: 140.0,
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
-      layoutDirection: "VERTICAL",
-      gap: 4,
-      padding: 6,
-      widgets: [],
-    },
-  ],
+  panels: [],
   stateOverrides: {
     EXPLORATION: { enabled: false, panels: [] },
     SCENE: { enabled: false, panels: [] },
@@ -117,6 +47,9 @@ export const BLANK_LAYOUT: LayoutFile = {
   },
 };
 
+/**
+ * Default Populated Lilith textRPG Preset
+ */
 export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
   layoutName: "Default Lilith RPG Layout",
   margin: 6.0,
@@ -124,10 +57,10 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
     {
       id: "top_bar",
       name: "Top Status Bar",
-      anchor: "TOP_BAR",
-      fixedHeight: 38.0,
-      backgroundColor: "bgHeader",
-      borderColor: "borderNormal",
+      x: 0.5,
+      y: 0.5,
+      width: 99,
+      height: 8,
       layoutDirection: "HORIZONTAL",
       gap: 8,
       padding: 6,
@@ -136,12 +69,10 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
     {
       id: "left_pane",
       name: "Left Sidebar",
-      anchor: "LEFT_SIDEBAR",
-      fixedWidth: 320.0,
-      minWidth: 240.0,
-      maxWidth: 480.0,
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
+      x: 0.5,
+      y: 9.5,
+      width: 25,
+      height: 70,
       layoutDirection: "VERTICAL",
       gap: 6,
       padding: 6,
@@ -155,9 +86,10 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
     {
       id: "center_pane",
       name: "Center Story & Narrative",
-      anchor: "CENTER_FLEX",
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
+      x: 26,
+      y: 9.5,
+      width: 48,
+      height: 70,
       layoutDirection: "VERTICAL",
       gap: 8,
       padding: 8,
@@ -171,12 +103,10 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
     {
       id: "right_pane",
       name: "Right World & Radar",
-      anchor: "RIGHT_SIDEBAR",
-      fixedWidth: 300.0,
-      minWidth: 220.0,
-      maxWidth: 450.0,
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
+      x: 74.5,
+      y: 9.5,
+      width: 25,
+      height: 70,
       layoutDirection: "VERTICAL",
       gap: 6,
       padding: 6,
@@ -185,10 +115,10 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
     {
       id: "bottom_action_grid",
       name: "Bottom Action Commands",
-      anchor: "BOTTOM_BAR",
-      fixedHeight: 140.0,
-      backgroundColor: "bgPanel",
-      borderColor: "borderNormal",
+      x: 0.5,
+      y: 80.5,
+      width: 99,
+      height: 19,
       layoutDirection: "VERTICAL",
       gap: 4,
       padding: 6,
