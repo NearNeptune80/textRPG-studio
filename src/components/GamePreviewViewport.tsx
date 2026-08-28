@@ -13,6 +13,7 @@ import {
   Columns,
   Rows,
   Scale,
+  Equal,
 } from "lucide-react";
 
 interface GamePreviewViewportProps {
@@ -39,6 +40,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   const [activeSplitZone, setActiveSplitZone] = useState<DropSplitZone>(null);
   const [draggedWidgetIndex, setDraggedWidgetIndex] = useState<{ nodeId: string; index: number } | null>(null);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+  const [secondarySelectedBoxId, setSecondarySelectedBoxId] = useState<string | null>(null);
 
   const colors = theme.colors;
   const radius = `${theme.borderRadius}px`;
@@ -65,6 +67,15 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     }
   };
 
+  // Helper: check if a subtree contains a specific node ID
+  const containsNode = (node: LayoutNode, targetId: string): boolean => {
+    if (node.id === targetId) return true;
+    if (node.type === "SPLIT" && node.children) {
+      return containsNode(node.children[0], targetId) || containsNode(node.children[1], targetId);
+    }
+    return false;
+  };
+
   // Tree Helper: Update a node in the BSP Tree
   const updateNodeInTree = (node: LayoutNode, targetId: string, updater: (n: LayoutNode) => LayoutNode): LayoutNode => {
     if (node.id === targetId) {
@@ -80,6 +91,79 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       };
     }
     return node;
+  };
+
+  // Get all leaf boxes currently in the tree
+  const getAllLeafBoxes = (node: LayoutNode): LayoutNode[] => {
+    if (node.type === "LEAF") return [node];
+    if (node.type === "SPLIT" && node.children) {
+      return [...getAllLeafBoxes(node.children[0]), ...getAllLeafBoxes(node.children[1])];
+    }
+    return [];
+  };
+
+  // Mathematical Equalization of any 2 arbitrary boxes anywhere in the tree
+  const matchSizesOfTwoBoxes = (root: LayoutNode, idA: string, idB: string, dimension: "WIDTH" | "HEIGHT"): LayoutNode => {
+    const findLCA = (node: LayoutNode): { lcaNode: LayoutNode; isAInLeft: boolean } | null => {
+      if (node.type !== "SPLIT" || !node.children) return null;
+      const aIn0 = containsNode(node.children[0], idA);
+      const aIn1 = containsNode(node.children[1], idA);
+      const bIn0 = containsNode(node.children[0], idB);
+      const bIn1 = containsNode(node.children[1], idB);
+
+      if ((aIn0 && bIn1) || (aIn1 && bIn0)) {
+        return { lcaNode: node, isAInLeft: aIn0 };
+      }
+      if (aIn0 && bIn0) return findLCA(node.children[0]);
+      if (aIn1 && bIn1) return findLCA(node.children[1]);
+      return null;
+    };
+
+    const getSubtreeFactor = (node: LayoutNode, targetId: string, dim: "WIDTH" | "HEIGHT"): number => {
+      if (node.id === targetId) return 1.0;
+      if (node.type === "SPLIT" && node.children) {
+        const isRelevantDir = (dim === "WIDTH" && node.direction === "HORIZONTAL") ||
+                              (dim === "HEIGHT" && node.direction === "VERTICAL");
+        const r = node.splitRatio ?? 0.5;
+        if (containsNode(node.children[0], targetId)) {
+          const factor = isRelevantDir ? r : 1.0;
+          return factor * getSubtreeFactor(node.children[0], targetId, dim);
+        }
+        if (containsNode(node.children[1], targetId)) {
+          const factor = isRelevantDir ? (1.0 - r) : 1.0;
+          return factor * getSubtreeFactor(node.children[1], targetId, dim);
+        }
+      }
+      return 1.0;
+    };
+
+    const lcaInfo = findLCA(root);
+    if (!lcaInfo) return root;
+
+    const { lcaNode, isAInLeft } = lcaInfo;
+    const childLeft = lcaNode.children![0];
+    const childRight = lcaNode.children![1];
+
+    const nodeLeftTarget = isAInLeft ? idA : idB;
+    const nodeRightTarget = isAInLeft ? idB : idA;
+
+    const kLeft = getSubtreeFactor(childLeft, nodeLeftTarget, dimension);
+    const kRight = getSubtreeFactor(childRight, nodeRightTarget, dimension);
+
+    // Solve for r such that: r * kLeft = (1 - r) * kRight
+    // => r = kRight / (kLeft + kRight)
+    let desiredRatio = kRight / (kLeft + kRight);
+    // Guardrails to prevent collapse: clamp between 0.05 and 0.95
+    desiredRatio = Math.max(0.05, Math.min(0.95, Math.round(desiredRatio * 1000) / 1000));
+
+    return updateNodeInTree(root, lcaNode.id, (n) => ({
+      ...n,
+      splitRatio: desiredRatio,
+    }));
+  };
+
+  const handleMakeBoxesEqual = (idA: string, idB: string, dim: "WIDTH" | "HEIGHT") => {
+    updateRootNode(matchSizesOfTwoBoxes(rootNode, idA, idB, dim));
   };
 
   // Find Parent Split Node
@@ -181,6 +265,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   const handleCloseBox = (nodeId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (selectedBoxId === nodeId) setSelectedBoxId(null);
+    if (secondarySelectedBoxId === nodeId) setSecondarySelectedBoxId(null);
 
     const newRoot = removeNodeFromTree(rootNode, nodeId);
     if (newRoot) {
@@ -210,7 +295,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       } else {
         ratio = (e.clientY - rect.top) / rect.height;
       }
-      ratio = Math.max(0.08, Math.min(0.92, ratio));
+      ratio = Math.max(0.05, Math.min(0.95, ratio));
 
       const updated = updateNodeInTree(rootNode, splitNodeId, (node) => ({
         ...node,
@@ -343,7 +428,9 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     return null;
   };
 
+  const allLeafBoxes = getAllLeafBoxes(rootNode);
   const selectedNode = selectedBoxId ? findNodeById(rootNode, selectedBoxId) : null;
+  const secondaryNode = secondarySelectedBoxId ? findNodeById(rootNode, secondarySelectedBoxId) : null;
   const parentSplit = selectedBoxId ? findParentSplitNode(rootNode, selectedBoxId) : null;
 
   // Recursive Tree Node Renderer
@@ -401,21 +488,36 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     // Leaf Node (Content Box)
     const isDragHover = activeHoverNodeId === node.id;
     const isSelected = selectedBoxId === node.id;
+    const isSecondarySelected = secondarySelectedBoxId === node.id;
     const widgets = node.widgets || [];
 
     return (
       <div
         key={node.id}
-        onClick={() => setSelectedBoxId(node.id)}
+        onClick={(e) => {
+          if (e.shiftKey && selectedBoxId && selectedBoxId !== node.id) {
+            setSecondarySelectedBoxId(node.id);
+          } else {
+            setSelectedBoxId(node.id);
+          }
+        }}
         onDragOver={(e) => handleBoxDragOver(e, node)}
         onDragLeave={handleBoxDragLeave}
         onDrop={(e) => handleBoxDrop(e, node)}
         className={`h-full w-full border p-2 flex flex-col relative transition-all overflow-hidden group/box min-h-0 min-w-0 cursor-pointer ${
-          isSelected ? "ring-2 ring-purple-500 shadow-lg shadow-purple-500/20" : ""
+          isSelected
+            ? "ring-2 ring-purple-500 shadow-lg shadow-purple-500/20"
+            : isSecondarySelected
+            ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20"
+            : ""
         }`}
         style={{
           backgroundColor: colorToCss(colors.bgPanel, opacity),
-          borderColor: isSelected ? colorToCss(colors.borderSelected) : colorToCss(colors.borderNormal),
+          borderColor: isSelected
+            ? colorToCss(colors.borderSelected)
+            : isSecondarySelected
+            ? "#f59e0b"
+            : colorToCss(colors.borderNormal),
           borderRadius: radius,
           borderWidth: borderW,
         }}
@@ -563,7 +665,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
           <button
             onClick={handleEqualizeAll}
             className="flex items-center gap-1.5 px-3 py-1 bg-black/40 hover:bg-purple-950/60 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
-            title="Reset all splits to exactly equal 50/50 parts"
+            title="Reset all splits across the entire layout to 50/50"
           >
             <Scale className="w-3.5 h-3.5" />
             <span>Equalize All Splits</span>
@@ -609,7 +711,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
         {/* Floating Box Options Popover / Drawer (Appears when box is selected) */}
         {selectedNode && (
-          <div className="w-72 bg-[#1c1a24] rounded-xl border border-purple-500/40 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto shrink-0 animate-in slide-in-from-right-4 duration-200">
+          <div className="w-80 bg-[#1c1a24] rounded-xl border border-purple-500/40 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto shrink-0 animate-in slide-in-from-right-4 duration-200">
             {/* Popover Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center gap-2">
@@ -617,26 +719,84 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                   <Settings2 className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-xs text-slate-100">{selectedNode.name || "Box Settings"}</h3>
+                  <h3 className="font-bold text-xs text-slate-100">{selectedNode.name || "Box Inspector"}</h3>
                   <span className="text-[10px] text-purple-400 font-mono">ID: {selectedNode.id}</span>
                 </div>
               </div>
               <button
-                onClick={() => setSelectedBoxId(null)}
+                onClick={() => {
+                  setSelectedBoxId(null);
+                  setSecondarySelectedBoxId(null);
+                }}
                 className="p-1 text-slate-400 hover:text-white rounded"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Equal Sizing & Split Ratio Presets */}
+            {/* Match Size with Another Box (2-Box Equalizer) */}
+            <div className="bg-black/35 p-3 rounded-xl border border-purple-500/30 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
+                <Equal className="w-4 h-4" />
+                <span>Match Size with Another Box</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Select any other box in your layout (or Shift+Click it on the canvas) to make both boxes identical in width or height:
+              </p>
+
+              {/* Target Box Selector */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-500 block uppercase font-mono">
+                  Select 2nd Box:
+                </label>
+                <select
+                  value={secondarySelectedBoxId || ""}
+                  onChange={(e) => setSecondarySelectedBoxId(e.target.value || null)}
+                  className="w-full px-2.5 py-1.5 bg-black/60 border border-white/10 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-400 font-medium"
+                >
+                  <option value="">-- Choose a box to match --</option>
+                  {allLeafBoxes
+                    .filter((b) => b.id !== selectedNode.id)
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name || b.id} ({b.widgets?.length || 0} widgets)
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {secondaryNode && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-[11px] bg-purple-950/40 p-2 rounded border border-purple-500/20 text-purple-200">
+                    <span>Comparing:</span>
+                    <span className="font-semibold">{selectedNode.id} ↔ {secondaryNode.id}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "WIDTH")}
+                      className="py-1.5 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition text-center"
+                    >
+                      Make Equal Width
+                    </button>
+                    <button
+                      onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "HEIGHT")}
+                      className="py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition text-center"
+                    >
+                      Make Equal Height
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Direct Sizing & Ratio Presets */}
             {parentSplit && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Sizing & Ratio Presets
+                    Parent Split Presets
                   </span>
-                  <span className="text-[10px] text-purple-300">
+                  <span className="text-[10px] text-purple-300 font-mono">
                     {Math.round((parentSplit.splitRatio || 0.5) * 100)}% / {Math.round((1 - (parentSplit.splitRatio || 0.5)) * 100)}%
                   </span>
                 </div>
@@ -644,38 +804,38 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                 <div className="grid grid-cols-3 gap-1.5 text-xs">
                   <button
                     onClick={() => setParentSplitRatio(selectedNode.id, 0.5)}
-                    className="p-2 rounded-lg bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 font-semibold text-center transition"
+                    className="p-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 font-semibold text-center transition text-[11px]"
                     title="Make this box exactly equal 50% / 50% with its neighbor"
                   >
                     50 / 50 (Equal)
                   </button>
                   <button
                     onClick={() => setParentSplitRatio(selectedNode.id, 0.333)}
-                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
                   >
                     33 / 67
                   </button>
                   <button
                     onClick={() => setParentSplitRatio(selectedNode.id, 0.25)}
-                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
                   >
                     25 / 75
                   </button>
                   <button
                     onClick={() => setParentSplitRatio(selectedNode.id, 0.20)}
-                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
                   >
                     20 / 80
                   </button>
                   <button
                     onClick={() => setParentSplitRatio(selectedNode.id, 0.667)}
-                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
                   >
                     67 / 33
                   </button>
                   <button
                     onClick={() => setParentSplitRatio(selectedNode.id, 0.75)}
-                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
                   >
                     75 / 25
                   </button>
