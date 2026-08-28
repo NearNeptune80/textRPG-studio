@@ -56,7 +56,7 @@ export const App: React.FC = () => {
           const parsed = JSON.parse(event.target?.result as string);
           if (parsed.colors) {
             setTheme(parsed);
-          } else if (parsed.panels) {
+          } else if (parsed.rootNode || parsed.panels) {
             setLayout(parsed);
           }
         } catch (err) {

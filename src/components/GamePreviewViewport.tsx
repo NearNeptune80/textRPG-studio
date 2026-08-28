@@ -1,9 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { ThemeFile, colorToCss } from "../types/theme";
-import { LayoutFile, GameSimulationState, PanelDefinition } from "../types/layout";
+import { LayoutFile, GameSimulationState, LayoutNode, SplitDirection } from "../types/layout";
 import { CustomWidgetDefinition } from "../types/elements";
 import { AtomicElementRenderer } from "./AtomicElementRenderer";
-import { Trash2, Plus, ArrowUp, ArrowDown, X, Move, Maximize2 } from "lucide-react";
+import { Trash2, Plus, ArrowUp, ArrowDown, X } from "lucide-react";
 
 interface GamePreviewViewportProps {
   theme: ThemeFile;
@@ -14,6 +14,8 @@ interface GamePreviewViewportProps {
   onSelectState: (st: GameSimulationState) => void;
 }
 
+type DropSplitZone = "TOP" | "BOTTOM" | "LEFT" | "RIGHT" | "CENTER" | null;
+
 export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   theme,
   layout,
@@ -23,248 +25,428 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   onSelectState,
 }) => {
   const [resolution, setResolution] = useState<"HD" | "FHD" | "ULTRAWIDE">("HD");
-  const [dragOverPanelId, setDragOverPanelId] = useState<string | null>(null);
-  const [draggedWidgetIndex, setDraggedWidgetIndex] = useState<{ panelId: string; index: number } | null>(null);
-
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const [activeHoverNodeId, setActiveHoverNodeId] = useState<string | null>(null);
+  const [activeSplitZone, setActiveSplitZone] = useState<DropSplitZone>(null);
+  const [draggedWidgetIndex, setDraggedWidgetIndex] = useState<{ nodeId: string; index: number } | null>(null);
 
   const colors = theme.colors;
   const radius = `${theme.borderRadius}px`;
   const borderW = `${theme.borderWidth}px`;
   const opacity = theme.panelOpacity / 100;
 
-  // Resolve current active panels based on state override
+  // Resolve current active rootNode based on state override
   const isStateOverride =
     activeState !== "UNIVERSAL" && layout.stateOverrides?.[activeState]?.enabled;
-  const activePanels = isStateOverride
-    ? layout.stateOverrides![activeState]!.panels
-    : layout.panels;
+  const rootNode = isStateOverride
+    ? layout.stateOverrides![activeState]!.rootNode
+    : layout.rootNode;
 
-  const updatePanels = (newPanels: PanelDefinition[]) => {
+  const updateRootNode = (newRoot: LayoutNode) => {
     if (!isStateOverride) {
-      onChangeLayout({ ...layout, panels: newPanels });
+      onChangeLayout({ ...layout, rootNode: newRoot });
     } else {
       const overrides = { ...layout.stateOverrides };
       overrides[activeState] = {
         enabled: true,
-        panels: newPanels,
+        rootNode: newRoot,
       };
       onChangeLayout({ ...layout, stateOverrides: overrides });
     }
   };
 
-  // Canvas Drop Handler (For placing new empty boxes anywhere)
-  const handleCanvasDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const containerType = e.dataTransfer.getData("layout-container");
-    if (containerType !== "EMPTY_BOX") return;
+  // Tree Helper: Update a node in the BSP Tree
+  const updateNodeInTree = (node: LayoutNode, targetId: string, updater: (n: LayoutNode) => LayoutNode): LayoutNode => {
+    if (node.id === targetId) {
+      return updater(node);
+    }
+    if (node.type === "SPLIT" && node.children) {
+      return {
+        ...node,
+        children: [
+          updateNodeInTree(node.children[0], targetId, updater),
+          updateNodeInTree(node.children[1], targetId, updater),
+        ],
+      };
+    }
+    return node;
+  };
 
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
+  // Tree Helper: Split a Leaf Node into 2 children
+  const splitLeafNode = (targetId: string, zone: DropSplitZone) => {
+    if (!zone || zone === "CENTER") return;
 
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const xPercent = Math.max(0.5, Math.min(75, Math.round((mouseX / rect.width) * 100 * 2) / 2));
-    const yPercent = Math.max(0.5, Math.min(75, Math.round((mouseY / rect.height) * 100 * 2) / 2));
-
-    const newPanel: PanelDefinition = {
-      id: `box_${Date.now() % 10000}`,
-      name: `Box ${activePanels.length + 1}`,
-      x: xPercent,
-      y: yPercent,
-      width: 30,
-      height: 35,
-      layoutDirection: "VERTICAL",
-      gap: 6,
-      padding: 6,
+    const isHorizontal = zone === "LEFT" || zone === "RIGHT";
+    const newEmptyNode: LayoutNode = {
+      id: `box_${Date.now() % 10000}_${Math.random().toString(36).substring(2, 4)}`,
+      type: "LEAF",
+      name: "New Box",
       widgets: [],
     };
 
-    updatePanels([...activePanels, newPanel]);
+    const newRoot = updateNodeInTree(rootNode, targetId, (existingNode) => {
+      const isFirst = zone === "LEFT" || zone === "TOP";
+      return {
+        id: `split_${Date.now() % 10000}`,
+        type: "SPLIT",
+        direction: isHorizontal ? "HORIZONTAL" : "VERTICAL",
+        splitRatio: 0.5,
+        children: isFirst
+          ? [newEmptyNode, { ...existingNode }]
+          : [{ ...existingNode }, newEmptyNode],
+      };
+    });
+
+    updateRootNode(newRoot);
   };
 
-  const handleDeleteBox = (panelId: string, e: React.MouseEvent) => {
+  // Tree Helper: Close / Remove a Leaf Node (Collapse parent split)
+  const removeNodeFromTree = (current: LayoutNode, targetId: string): LayoutNode | null => {
+    if (current.id === targetId) {
+      return null;
+    }
+    if (current.type === "SPLIT" && current.children) {
+      const leftResult = removeNodeFromTree(current.children[0], targetId);
+      const rightResult = removeNodeFromTree(current.children[1], targetId);
+
+      if (leftResult === null && rightResult !== null) return rightResult;
+      if (rightResult === null && leftResult !== null) return leftResult;
+      if (leftResult && rightResult) {
+        return {
+          ...current,
+          children: [leftResult, rightResult],
+        };
+      }
+    }
+    return current;
+  };
+
+  const handleCloseBox = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    updatePanels(activePanels.filter((p) => p.id !== panelId));
-  };
-
-  // 2D Box Moving
-  const startMoveBox = (panelId: string, initialX: number, initialY: number, startClientX: number, startClientY: number) => {
-    if (!canvasRef.current) return;
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    const targetElement = document.getElementById(`panel_${panelId}`);
-
-    let currentX = initialX;
-    let currentY = initialY;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaXPercent = ((e.clientX - startClientX) / canvasRect.width) * 100;
-      const deltaYPercent = ((e.clientY - startClientY) / canvasRect.height) * 100;
-
-      const panel = activePanels.find((p) => p.id === panelId);
-      const w = panel?.width || 30;
-      const h = panel?.height || 35;
-
-      currentX = Math.max(0, Math.min(100 - w, Math.round((initialX + deltaXPercent) * 2) / 2));
-      currentY = Math.max(0, Math.min(100 - h, Math.round((initialY + deltaYPercent) * 2) / 2));
-
-      if (targetElement) {
-        targetElement.style.left = `${currentX}%`;
-        targetElement.style.top = `${currentY}%`;
-      }
-    };
-
-    const handleMouseUp = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      updatePanels(
-        activePanels.map((p) => (p.id === panelId ? { ...p, x: currentX, y: currentY } : p))
-      );
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
-
-  // 2D Box Resizing (Right, Bottom, Corner)
-  const startResizeBox = (
-    panelId: string,
-    initialW: number,
-    initialH: number,
-    startClientX: number,
-    startClientY: number,
-    mode: "WIDTH" | "HEIGHT" | "CORNER"
-  ) => {
-    if (!canvasRef.current) return;
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    const targetElement = document.getElementById(`panel_${panelId}`);
-
-    let currentW = initialW;
-    let currentH = initialH;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaXPercent = ((e.clientX - startClientX) / canvasRect.width) * 100;
-      const deltaYPercent = ((e.clientY - startClientY) / canvasRect.height) * 100;
-
-      const panel = activePanels.find((p) => p.id === panelId);
-      const px = panel?.x || 0;
-      const py = panel?.y || 0;
-
-      if (mode === "WIDTH" || mode === "CORNER") {
-        currentW = Math.max(10, Math.min(100 - px, Math.round((initialW + deltaXPercent) * 2) / 2));
-      }
-      if (mode === "HEIGHT" || mode === "CORNER") {
-        currentH = Math.max(8, Math.min(100 - py, Math.round((initialH + deltaYPercent) * 2) / 2));
-      }
-
-      if (targetElement) {
-        if (mode === "WIDTH" || mode === "CORNER") targetElement.style.width = `${currentW}%`;
-        if (mode === "HEIGHT" || mode === "CORNER") targetElement.style.height = `${currentH}%`;
-      }
-    };
-
-    const handleMouseUp = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      updatePanels(
-        activePanels.map((p) =>
-          p.id === panelId ? { ...p, width: currentW, height: currentH } : p
-        )
-      );
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
-
-  // Widget Drag & Drop inside Boxes
-  const handlePanelDragOver = (e: React.DragEvent, panelId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "copy";
-    if (dragOverPanelId !== panelId) {
-      setDragOverPanelId(panelId);
+    const newRoot = removeNodeFromTree(rootNode, nodeId);
+    if (newRoot) {
+      updateRootNode(newRoot);
+    } else {
+      // If closing the last box, reset to 1 empty main box
+      updateRootNode({
+        id: "box_main",
+        type: "LEAF",
+        name: "Main Canvas Box",
+        widgets: [],
+      });
     }
   };
 
-  const handlePanelDragLeave = () => {
-    setDragOverPanelId(null);
+  // Tree Helper: Update Split Ratio on Drag (Zero-Lag direct calculation)
+  const startResizeSplitter = (
+    splitNodeId: string,
+    direction: SplitDirection,
+    containerElement: HTMLElement
+  ) => {
+    const rect = containerElement.getBoundingClientRect();
+
+    const handleMouseMove = (e: MouseEvent) => {
+      let ratio: number;
+      if (direction === "HORIZONTAL") {
+        ratio = (e.clientX - rect.left) / rect.width;
+      } else {
+        ratio = (e.clientY - rect.top) / rect.height;
+      }
+      ratio = Math.max(0.08, Math.min(0.92, ratio));
+
+      const updated = updateNodeInTree(rootNode, splitNodeId, (node) => ({
+        ...node,
+        splitRatio: Math.round(ratio * 1000) / 1000,
+      }));
+      updateRootNode(updated);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
   };
 
-  const handlePanelDrop = (e: React.DragEvent, panelId: string) => {
+  // Drop handlers for Dragging Boxes and Widgets
+  const handleBoxDragOver = (e: React.DragEvent, node: LayoutNode) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragOverPanelId(null);
+    const containerType = e.dataTransfer.types.includes("layout-container");
 
-    const widgetId = e.dataTransfer.getData("text/plain");
+    setActiveHoverNodeId(node.id);
 
-    if (draggedWidgetIndex) {
-      const { panelId: srcPanelId, index: srcIndex } = draggedWidgetIndex;
-      setDraggedWidgetIndex(null);
+    if (containerType) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relX = (e.clientX - rect.left) / rect.width;
+      const relY = (e.clientY - rect.top) / rect.height;
 
-      if (srcPanelId === panelId) return;
+      // Determine split zone based on proximity to 4 borders
+      if (relY < 0.28) setActiveSplitZone("TOP");
+      else if (relY > 0.72) setActiveSplitZone("BOTTOM");
+      else if (relX < 0.35) setActiveSplitZone("LEFT");
+      else if (relX > 0.65) setActiveSplitZone("RIGHT");
+      else setActiveSplitZone("RIGHT");
+    } else {
+      setActiveSplitZone("CENTER");
+    }
+  };
 
-      const nextPanels = activePanels.map((p) => {
-        if (p.id === srcPanelId) {
-          const nextWidgets = [...p.widgets];
-          nextWidgets.splice(srcIndex, 1);
-          return { ...p, widgets: nextWidgets };
-        }
-        if (p.id === panelId) {
-          return { ...p, widgets: [...p.widgets, widgetId] };
-        }
-        return p;
-      });
-      updatePanels(nextPanels);
+  const handleBoxDragLeave = () => {
+    setActiveHoverNodeId(null);
+    setActiveSplitZone(null);
+  };
+
+  const handleBoxDrop = (e: React.DragEvent, node: LayoutNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const isContainer = e.dataTransfer.getData("layout-container");
+    if (isContainer === "EMPTY_BOX") {
+      splitLeafNode(node.id, activeSplitZone || "RIGHT");
+      setActiveHoverNodeId(null);
+      setActiveSplitZone(null);
       return;
     }
 
-    if (!widgetId) return;
+    const widgetId = e.dataTransfer.getData("text/plain");
 
-    const nextPanels = activePanels.map((p) => {
-      if (p.id === panelId) {
-        return {
-          ...p,
-          widgets: [...p.widgets, widgetId],
-        };
+    // Reordering/moving widget between boxes
+    if (draggedWidgetIndex) {
+      const { nodeId: srcNodeId, index: srcIndex } = draggedWidgetIndex;
+      setDraggedWidgetIndex(null);
+
+      if (srcNodeId === node.id) {
+        setActiveHoverNodeId(null);
+        setActiveSplitZone(null);
+        return;
       }
-      return p;
-    });
 
-    updatePanels(nextPanels);
+      let nextRoot = updateNodeInTree(rootNode, srcNodeId, (n) => {
+        const nextW = [...(n.widgets || [])];
+        nextW.splice(srcIndex, 1);
+        return { ...n, widgets: nextW };
+      });
+
+      nextRoot = updateNodeInTree(nextRoot, node.id, (n) => {
+        return { ...n, widgets: [...(n.widgets || []), widgetId] };
+      });
+
+      updateRootNode(nextRoot);
+      setActiveHoverNodeId(null);
+      setActiveSplitZone(null);
+      return;
+    }
+
+    // Adding fresh widget from library
+    if (widgetId) {
+      const updated = updateNodeInTree(rootNode, node.id, (n) => ({
+        ...n,
+        widgets: [...(n.widgets || []), widgetId],
+      }));
+      updateRootNode(updated);
+    }
+
+    setActiveHoverNodeId(null);
+    setActiveSplitZone(null);
   };
 
-  const handleRemoveWidget = (panelId: string, widgetIndex: number, e: React.MouseEvent) => {
+  const handleRemoveWidget = (nodeId: string, widgetIndex: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextPanels = activePanels.map((p) => {
-      if (p.id === panelId) {
-        const nextWidgets = [...p.widgets];
-        nextWidgets.splice(widgetIndex, 1);
-        return { ...p, widgets: nextWidgets };
-      }
-      return p;
+    const updated = updateNodeInTree(rootNode, nodeId, (n) => {
+      const nextW = [...(n.widgets || [])];
+      nextW.splice(widgetIndex, 1);
+      return { ...n, widgets: nextW };
     });
-    updatePanels(nextPanels);
+    updateRootNode(updated);
   };
 
-  const handleMoveWidget = (panelId: string, index: number, up: boolean, e: React.MouseEvent) => {
+  const handleMoveWidget = (nodeId: string, index: number, up: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
     const target = up ? index - 1 : index + 1;
-    const panel = activePanels.find((p) => p.id === panelId);
-    if (!panel || target < 0 || target >= panel.widgets.length) return;
-
-    const nextPanels = activePanels.map((p) => {
-      if (p.id === panelId) {
-        const nextWidgets = [...p.widgets];
-        const temp = nextWidgets[index];
-        nextWidgets[index] = nextWidgets[target];
-        nextWidgets[target] = temp;
-        return { ...p, widgets: nextWidgets };
-      }
-      return p;
+    const updated = updateNodeInTree(rootNode, nodeId, (n) => {
+      const nextW = [...(n.widgets || [])];
+      if (target < 0 || target >= nextW.length) return n;
+      const temp = nextW[index];
+      nextW[index] = nextW[target];
+      nextW[target] = temp;
+      return { ...n, widgets: nextW };
     });
-    updatePanels(nextPanels);
+    updateRootNode(updated);
+  };
+
+  // Recursive Tree Node Renderer
+  const renderLayoutNode = (node: LayoutNode): React.ReactNode => {
+    if (node.type === "SPLIT" && node.children) {
+      const isHorizontal = node.direction === "HORIZONTAL";
+      const ratio = node.splitRatio ?? 0.5;
+
+      return (
+        <div
+          key={node.id}
+          className={`h-full w-full flex ${
+            isHorizontal ? "flex-row" : "flex-col"
+          } min-h-0 min-w-0 overflow-hidden select-none`}
+        >
+          {/* First Child */}
+          <div
+            style={{
+              flex: `${ratio} ${ratio} 0%`,
+            }}
+            className="min-h-0 min-w-0 overflow-hidden flex flex-col"
+          >
+            {renderLayoutNode(node.children[0])}
+          </div>
+
+          {/* Interactive Splitter Divider Line */}
+          <div
+            onMouseDown={(e) => {
+              const parent = e.currentTarget.parentElement;
+              if (parent) {
+                startResizeSplitter(node.id, node.direction || "HORIZONTAL", parent);
+              }
+            }}
+            className={`shrink-0 transition-colors z-20 ${
+              isHorizontal
+                ? "w-1.5 h-full cursor-col-resize hover:bg-purple-500 active:bg-purple-400"
+                : "w-full h-1.5 cursor-row-resize hover:bg-purple-500 active:bg-purple-400"
+            }`}
+            title="Drag to resize split"
+          />
+
+          {/* Second Child */}
+          <div
+            style={{
+              flex: `${1 - ratio} ${1 - ratio} 0%`,
+            }}
+            className="min-h-0 min-w-0 overflow-hidden flex flex-col"
+          >
+            {renderLayoutNode(node.children[1])}
+          </div>
+        </div>
+      );
+    }
+
+    // Leaf Node (Content Box)
+    const isDragHover = activeHoverNodeId === node.id;
+    const widgets = node.widgets || [];
+
+    return (
+      <div
+        key={node.id}
+        onDragOver={(e) => handleBoxDragOver(e, node)}
+        onDragLeave={handleBoxDragLeave}
+        onDrop={(e) => handleBoxDrop(e, node)}
+        className="h-full w-full border p-2 flex flex-col relative transition-all overflow-hidden group/box min-h-0 min-w-0"
+        style={{
+          backgroundColor: colorToCss(colors.bgPanel, opacity),
+          borderColor: colorToCss(colors.borderNormal),
+          borderRadius: radius,
+          borderWidth: borderW,
+        }}
+      >
+        {/* Floating Delete Box Button (Top Right corner on hover) */}
+        <button
+          onClick={(e) => handleCloseBox(node.id, e)}
+          className="absolute top-1.5 right-1.5 opacity-0 group-hover/box:opacity-100 p-1 rounded bg-black/85 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-white/10 z-30 transition shadow"
+          title="Close / Collapse this box"
+        >
+          <X className="w-3 h-3" />
+        </button>
+
+        {/* Visual Glowing Split Drop Preview Zone */}
+        {isDragHover && activeSplitZone && (
+          <div
+            className={`absolute z-40 bg-purple-600/30 border-2 border-purple-400 pointer-events-none transition-all rounded ${
+              activeSplitZone === "TOP"
+                ? "top-0 left-0 right-0 h-1/2"
+                : activeSplitZone === "BOTTOM"
+                ? "bottom-0 left-0 right-0 h-1/2"
+                : activeSplitZone === "LEFT"
+                ? "top-0 bottom-0 left-0 w-1/2"
+                : activeSplitZone === "RIGHT"
+                ? "top-0 bottom-0 right-0 w-1/2"
+                : "inset-0"
+            }`}
+          />
+        )}
+
+        {/* Scrollable Widget Container */}
+        <div className="flex-1 w-full overflow-y-auto overflow-x-hidden pr-0.5 flex flex-col gap-2 rounded transition-all min-h-0">
+          {widgets.length === 0 ? (
+            <div className="h-full flex-1 min-h-[48px] flex flex-col items-center justify-center p-3 rounded border-2 border-dashed border-white/10 text-slate-500 hover:border-purple-500/40 hover:text-purple-300 transition-all text-center">
+              <span className="text-[11px] font-medium flex items-center gap-1">
+                <Plus className="w-3.5 h-3.5 text-purple-400" />
+                <span>Drop Widgets or Drag Box to Split</span>
+              </span>
+            </div>
+          ) : (
+            widgets.map((wId, idx) => {
+              const widgetDef = availableWidgets.find((w) => w.id === wId);
+              if (!widgetDef) return null;
+
+              return (
+                <div
+                  key={`${wId}_${idx}`}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", wId);
+                    setDraggedWidgetIndex({ nodeId: node.id, index: idx });
+                  }}
+                  className="relative group/widget p-1.5 rounded transition shadow-sm w-full shrink-0"
+                >
+                  {/* Hover Floating Widget Controls */}
+                  <div className="absolute top-1 right-1 opacity-0 group-hover/widget:opacity-100 flex items-center gap-1 bg-black/90 px-1.5 py-0.5 rounded border border-white/10 z-20 text-[10px] shadow-lg">
+                    <button
+                      onClick={(e) => handleMoveWidget(node.id, idx, true, e)}
+                      disabled={idx === 0}
+                      className="p-0.5 text-slate-400 hover:text-white disabled:opacity-20"
+                      title="Move Up"
+                    >
+                      <ArrowUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => handleMoveWidget(node.id, idx, false, e)}
+                      disabled={idx === widgets.length - 1}
+                      className="p-0.5 text-slate-400 hover:text-white disabled:opacity-20"
+                      title="Move Down"
+                    >
+                      <ArrowDown className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => handleRemoveWidget(node.id, idx, e)}
+                      className="p-0.5 text-slate-400 hover:text-rose-400"
+                      title="Remove widget"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Rendered Elements inside Widget */}
+                  <div
+                    className={`w-full flex ${
+                      widgetDef.layoutDirection === "HORIZONTAL"
+                        ? "flex-row items-center justify-between"
+                        : "flex-col"
+                    } gap-${widgetDef.gap / 2}`}
+                  >
+                    {widgetDef.elements.map((el) => (
+                      <AtomicElementRenderer
+                        key={el.id}
+                        element={el}
+                        theme={theme}
+                        activeState={activeState === "UNIVERSAL" ? "EXPLORATION" : activeState}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -313,186 +495,16 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
         </div>
       </div>
 
-      {/* Freeform 2D Responsive Game Canvas */}
+      {/* BSP Tile Snapped Game Canvas */}
       <div
-        ref={canvasRef}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "copy";
-        }}
-        onDrop={handleCanvasDrop}
-        className="flex-1 w-full rounded-xl overflow-hidden border shadow-2xl relative transition-all min-h-0"
+        className="flex-1 w-full rounded-xl overflow-hidden border shadow-2xl relative transition-all min-h-0 p-2 flex flex-col"
         style={{
           backgroundColor: colorToCss(colors.bgDark),
           borderColor: colorToCss(colors.borderNormal),
           borderWidth: borderW,
         }}
       >
-        {/* Empty Canvas Guide (When no boxes exist) */}
-        {activePanels.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center text-slate-500 pointer-events-none">
-            <div className="w-12 h-12 rounded-2xl bg-purple-600/15 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-3">
-              <Plus className="w-6 h-6" />
-            </div>
-            <span className="font-semibold text-sm text-slate-200 mb-1">Canvas is Blank</span>
-            <p className="text-xs text-slate-400 max-w-sm">
-              Drag "+ Empty Box" from the left sidebar and drop it anywhere on the canvas to place custom boxes!
-            </p>
-          </div>
-        )}
-
-        {/* 2D Freeform Boxes */}
-        {activePanels.map((panel) => {
-          const isDragHover = dragOverPanelId === panel.id;
-
-          return (
-            <div
-              key={panel.id}
-              id={`panel_${panel.id}`}
-              onDragOver={(e) => handlePanelDragOver(e, panel.id)}
-              onDragLeave={handlePanelDragLeave}
-              onDrop={(e) => handlePanelDrop(e, panel.id)}
-              className="absolute border p-2 flex flex-col transition-all overflow-hidden group/box"
-              style={{
-                left: `${panel.x}%`,
-                top: `${panel.y}%`,
-                width: `${panel.width}%`,
-                height: `${panel.height}%`,
-                backgroundColor: colorToCss(colors.bgPanel, opacity),
-                borderColor: colorToCss(colors.borderNormal),
-                borderRadius: radius,
-                borderWidth: borderW,
-              }}
-            >
-              {/* Floating Hover Controls (Move Handle & Delete Button) */}
-              <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/box:opacity-100 flex items-center gap-1 z-30 transition bg-black/85 px-1.5 py-0.5 rounded border border-white/10 shadow-lg">
-                <button
-                  onMouseDown={(e) => startMoveBox(panel.id, panel.x, panel.y, e.clientX, e.clientY)}
-                  className="p-0.5 text-slate-400 hover:text-purple-300 cursor-move"
-                  title="Drag to reposition box anywhere"
-                >
-                  <Move className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={(e) => handleDeleteBox(panel.id, e)}
-                  className="p-0.5 text-slate-400 hover:text-rose-400"
-                  title="Delete Box"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Scrollable Widget Container */}
-              <div
-                className={`flex-1 w-full overflow-y-auto overflow-x-hidden pr-0.5 flex ${
-                  panel.layoutDirection === "HORIZONTAL" ? "flex-row items-center flex-wrap" : "flex-col"
-                } gap-2 rounded transition-all min-h-0 ${
-                  isDragHover ? "ring-2 ring-purple-500/60 bg-purple-950/20" : ""
-                }`}
-              >
-                {panel.widgets.length === 0 ? (
-                  <div className="h-full flex-1 min-h-[48px] flex flex-col items-center justify-center p-3 rounded border-2 border-dashed border-white/10 text-slate-500 hover:border-purple-500/40 hover:text-purple-300 transition-all text-center">
-                    <span className="text-[11px] font-medium flex items-center gap-1">
-                      <Plus className="w-3 h-3 text-purple-400" />
-                      <span>Drop Widget Here</span>
-                    </span>
-                  </div>
-                ) : (
-                  panel.widgets.map((wId, idx) => {
-                    const widgetDef = availableWidgets.find((w) => w.id === wId);
-                    if (!widgetDef) return null;
-
-                    return (
-                      <div
-                        key={`${wId}_${idx}`}
-                        draggable={true}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", wId);
-                          setDraggedWidgetIndex({ panelId: panel.id, index: idx });
-                        }}
-                        className="relative group/widget p-1.5 rounded transition shadow-sm w-full shrink-0"
-                      >
-                        {/* Hover Floating Widget Controls */}
-                        <div className="absolute top-1 right-1 opacity-0 group-hover/widget:opacity-100 flex items-center gap-1 bg-black/90 px-1.5 py-0.5 rounded border border-white/10 z-20 text-[10px] shadow-lg">
-                          <button
-                            onClick={(e) => handleMoveWidget(panel.id, idx, true, e)}
-                            disabled={idx === 0}
-                            className="p-0.5 text-slate-400 hover:text-white disabled:opacity-20"
-                            title="Move Up"
-                          >
-                            <ArrowUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => handleMoveWidget(panel.id, idx, false, e)}
-                            disabled={idx === panel.widgets.length - 1}
-                            className="p-0.5 text-slate-400 hover:text-white disabled:opacity-20"
-                            title="Move Down"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => handleRemoveWidget(panel.id, idx, e)}
-                            className="p-0.5 text-slate-400 hover:text-rose-400"
-                            title="Remove widget"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        {/* Rendered Elements inside Widget */}
-                        <div
-                          className={`w-full flex ${
-                            widgetDef.layoutDirection === "HORIZONTAL"
-                              ? "flex-row items-center justify-between"
-                              : "flex-col"
-                          } gap-${widgetDef.gap / 2}`}
-                        >
-                          {widgetDef.elements.map((el) => (
-                            <AtomicElementRenderer
-                              key={el.id}
-                              element={el}
-                              theme={theme}
-                              activeState={activeState === "UNIVERSAL" ? "EXPLORATION" : activeState}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* 2D Resize Handle - Right Border (Width) */}
-              <div
-                onMouseDown={(e) =>
-                  startResizeBox(panel.id, panel.width, panel.height, e.clientX, e.clientY, "WIDTH")
-                }
-                className="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-purple-500/40 transition"
-                title="Drag to resize width"
-              />
-
-              {/* 2D Resize Handle - Bottom Border (Height) */}
-              <div
-                onMouseDown={(e) =>
-                  startResizeBox(panel.id, panel.width, panel.height, e.clientX, e.clientY, "HEIGHT")
-                }
-                className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-purple-500/40 transition"
-                title="Drag to resize height"
-              />
-
-              {/* 2D Resize Handle - Bottom-Right Corner (Width & Height) */}
-              <div
-                onMouseDown={(e) =>
-                  startResizeBox(panel.id, panel.width, panel.height, e.clientX, e.clientY, "CORNER")
-                }
-                className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 cursor-nwse-resize text-slate-500 hover:text-purple-400 flex items-center justify-center transition"
-                title="Drag to resize both width and height"
-              >
-                <Maximize2 className="w-2.5 h-2.5 rotate-90" />
-              </div>
-            </div>
-          );
-        })}
+        {renderLayoutNode(rootNode)}
       </div>
     </div>
   );

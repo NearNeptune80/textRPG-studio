@@ -36,12 +36,12 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
     if (!currentStatus) {
       overrides[activeEditingState] = {
         enabled: true,
-        panels: JSON.parse(JSON.stringify(layout.panels)),
+        rootNode: JSON.parse(JSON.stringify(layout.rootNode)),
       };
     } else {
       overrides[activeEditingState] = {
         enabled: false,
-        panels: [],
+        rootNode: { id: "box_empty", type: "LEAF", widgets: [] },
       };
     }
     onChange({ ...layout, stateOverrides: overrides });

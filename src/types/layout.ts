@@ -6,123 +6,126 @@ export type GameSimulationState =
   | "COMBAT"
   | "INVENTORY";
 
+export type SplitDirection = "HORIZONTAL" | "VERTICAL";
+
 /**
- * 2D Responsive Freeform Panel Box.
- * Positions and dimensions are stored in percentage (0 to 100%) so layouts
- * adapt fluidly across any resolution (HD, FHD, 4K, Ultrawide).
+ * Binary Space Partitioning (BSP) Tile Node.
+ * A node is either a LEAF (contains widgets) or a SPLIT (contains 2 children split horizontally or vertically).
  */
-export interface PanelDefinition {
+export interface LayoutNode {
   id: string;
-  name: string;
-  x: number;      // % (0 to 100)
-  y: number;      // % (0 to 100)
-  width: number;  // % (0 to 100)
-  height: number; // % (0 to 100)
-  layoutDirection?: "VERTICAL" | "HORIZONTAL";
-  gap?: number;
-  padding?: number;
-  widgets: string[]; // List of Widget IDs
+  type: "SPLIT" | "LEAF";
+  name?: string;
+  direction?: SplitDirection; // HORIZONTAL = Left/Right columns, VERTICAL = Top/Bottom rows
+  splitRatio?: number;        // Fraction from 0.05 to 0.95 (default 0.5)
+  children?: [LayoutNode, LayoutNode];
+  widgets?: string[];         // List of widget IDs inside this leaf box
 }
 
 export interface LayoutFile {
   layoutName: string;
   margin: number;
-  panels: PanelDefinition[];
-  stateOverrides?: Partial<Record<GameSimulationState, { enabled: boolean; panels: PanelDefinition[] }>>;
+  rootNode: LayoutNode;
+  stateOverrides?: Partial<Record<GameSimulationState, { enabled: boolean; rootNode: LayoutNode }>>;
 }
 
 /**
- * Clean, empty blank layout template as requested by the user.
+ * Clean, single large box blank layout template as requested by the user.
  */
 export const BLANK_LAYOUT: LayoutFile = {
-  layoutName: "Custom Blank Layout",
+  layoutName: "Custom Tile Layout",
   margin: 6.0,
-  panels: [],
+  rootNode: {
+    id: "box_main",
+    type: "LEAF",
+    name: "Main Canvas Box",
+    widgets: [],
+  },
   stateOverrides: {
-    EXPLORATION: { enabled: false, panels: [] },
-    SCENE: { enabled: false, panels: [] },
-    SEX: { enabled: false, panels: [] },
-    COMBAT: { enabled: false, panels: [] },
-    INVENTORY: { enabled: false, panels: [] },
+    EXPLORATION: { enabled: false, rootNode: { id: "box_exp", type: "LEAF", widgets: [] } },
+    SCENE: { enabled: false, rootNode: { id: "box_scene", type: "LEAF", widgets: [] } },
+    SEX: { enabled: false, rootNode: { id: "box_sex", type: "LEAF", widgets: [] } },
+    COMBAT: { enabled: false, rootNode: { id: "box_combat", type: "LEAF", widgets: [] } },
+    INVENTORY: { enabled: false, rootNode: { id: "box_inv", type: "LEAF", widgets: [] } },
   },
 };
 
 /**
- * Default Populated Lilith textRPG Preset
+ * Default Populated Lilith textRPG BSP Tile Preset
  */
 export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
   layoutName: "Default Lilith RPG Layout",
   margin: 6.0,
-  panels: [
-    {
-      id: "top_bar",
-      name: "Top Status Bar",
-      x: 0.5,
-      y: 0.5,
-      width: 99,
-      height: 8,
-      layoutDirection: "HORIZONTAL",
-      gap: 8,
-      padding: 6,
-      widgets: ["widget_top_bar_full"],
-    },
-    {
-      id: "left_pane",
-      name: "Left Sidebar",
-      x: 0.5,
-      y: 9.5,
-      width: 25,
-      height: 70,
-      layoutDirection: "VERTICAL",
-      gap: 6,
-      padding: 6,
-      widgets: [
-        "widget_char_overview",
-        "widget_vitals_gauges",
-        "widget_attributes_table",
-        "widget_anatomy_fluids",
-      ],
-    },
-    {
-      id: "center_pane",
-      name: "Center Story & Narrative",
-      x: 26,
-      y: 9.5,
-      width: 48,
-      height: 70,
-      layoutDirection: "VERTICAL",
-      gap: 8,
-      padding: 8,
-      widgets: [
-        "widget_narrative_story",
-        "widget_erotic_encounter",
-        "widget_tactical_combat",
-        "widget_inventory_dual",
-      ],
-    },
-    {
-      id: "right_pane",
-      name: "Right World & Radar",
-      x: 74.5,
-      y: 9.5,
-      width: 25,
-      height: 70,
-      layoutDirection: "VERTICAL",
-      gap: 6,
-      padding: 6,
-      widgets: ["widget_minimap_radar"],
-    },
-    {
-      id: "bottom_action_grid",
-      name: "Bottom Action Commands",
-      x: 0.5,
-      y: 80.5,
-      width: 99,
-      height: 19,
-      layoutDirection: "VERTICAL",
-      gap: 4,
-      padding: 6,
-      widgets: ["widget_action_commands"],
-    },
-  ],
+  rootNode: {
+    id: "root_split_v",
+    type: "SPLIT",
+    direction: "VERTICAL", // Top Bar vs Body + Bottom Action
+    splitRatio: 0.07,
+    children: [
+      {
+        id: "top_bar",
+        type: "LEAF",
+        name: "Top Status Bar",
+        widgets: ["widget_top_bar_full"],
+      },
+      {
+        id: "body_and_bottom_split",
+        type: "SPLIT",
+        direction: "VERTICAL",
+        splitRatio: 0.78,
+        children: [
+          {
+            id: "middle_columns_split",
+            type: "SPLIT",
+            direction: "HORIZONTAL", // Left Sidebar vs Center & Right
+            splitRatio: 0.25,
+            children: [
+              {
+                id: "left_sidebar",
+                type: "LEAF",
+                name: "Left Sidebar",
+                widgets: [
+                  "widget_char_overview",
+                  "widget_vitals_gauges",
+                  "widget_attributes_table",
+                  "widget_anatomy_fluids",
+                ],
+              },
+              {
+                id: "center_and_right_split",
+                type: "SPLIT",
+                direction: "HORIZONTAL", // Center Story vs Right Radar
+                splitRatio: 0.66,
+                children: [
+                  {
+                    id: "center_story",
+                    type: "LEAF",
+                    name: "Center Story & Narrative",
+                    widgets: [
+                      "widget_narrative_story",
+                      "widget_erotic_encounter",
+                      "widget_tactical_combat",
+                      "widget_inventory_dual",
+                    ],
+                  },
+                  {
+                    id: "right_sidebar",
+                    type: "LEAF",
+                    name: "Right World & Radar",
+                    widgets: ["widget_minimap_radar"],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "bottom_actions",
+            type: "LEAF",
+            name: "Bottom Action Commands",
+            widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    ],
+  },
 };
