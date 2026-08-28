@@ -5,6 +5,8 @@ export interface RGBAColor {
   a: number;
 }
 
+export type GaugeStyle = "SOLID" | "STRIPED" | "SEGMENTED" | "GLOW";
+
 export interface ThemeColors {
   bgDark: RGBAColor;
   bgPanel: RGBAColor;
@@ -44,11 +46,17 @@ export interface ThemeFile {
   themeName: string;
   fontPath?: string;
   baseFontSize?: number;
+  borderRadius: number;
+  borderWidth: number;
+  gaugeStyle: GaugeStyle;
+  panelOpacity: number;
+  glassmorphism: boolean;
   colors: ThemeColors;
 }
 
-export const colorToCss = (c: RGBAColor): string => {
-  return `rgba(${c.r}, ${c.g}, ${c.b}, ${c.a / 255})`;
+export const colorToCss = (c: RGBAColor, alphaOverride?: number): string => {
+  const a = alphaOverride !== undefined ? alphaOverride : c.a / 255;
+  return `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
 };
 
 export const hexToRgba = (hex: string, a: number = 255): RGBAColor => {
@@ -74,6 +82,11 @@ export const DEFAULT_DARK_FANTASY_THEME: ThemeFile = {
   themeName: "Dark Fantasy (Default)",
   fontPath: "data/fonts/Roboto/static/Roboto-Medium.ttf",
   baseFontSize: 14,
+  borderRadius: 4,
+  borderWidth: 1,
+  gaugeStyle: "SOLID",
+  panelOpacity: 100,
+  glassmorphism: false,
   colors: {
     bgDark: { r: 20, g: 18, b: 24, a: 255 },
     bgPanel: { r: 30, g: 28, b: 36, a: 255 },

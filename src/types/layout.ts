@@ -6,23 +6,17 @@ export type PanelAnchorType =
   | "CENTER_FLEX"
   | "FLOATING_RECT";
 
-export type WidgetType =
-  | "TOP_STATUS_BAR"
-  | "CHARACTER_OVERVIEW"
-  | "STAT_BARS"
-  | "PAPERDOLL_SOCKETS"
-  | "EQUIPMENT_GRID"
-  | "BACKPACK_INVENTORY"
-  | "SCENE_NARRATIVE"
-  | "INTERACTIVE_SEX"
-  | "COMBAT_VIEW"
-  | "RESOLUTION_HUB"
-  | "MINIMAP_RADAR"
-  | "TARGET_INSPECTOR"
-  | "ACTION_GRID";
+export type GameSimulationState =
+  | "UNIVERSAL"
+  | "EXPLORATION"
+  | "SCENE"
+  | "SEX"
+  | "COMBAT"
+  | "INVENTORY";
 
 export interface PanelDefinition {
   id: string;
+  name?: string;
   anchor: PanelAnchorType;
   fixedWidth?: number;
   fixedHeight?: number;
@@ -30,14 +24,17 @@ export interface PanelDefinition {
   maxWidth?: number;
   backgroundColor?: string;
   borderColor?: string;
-  widgets: WidgetType[];
-  visibleInStates?: string[];
+  layoutDirection?: "VERTICAL" | "HORIZONTAL";
+  gap?: number;
+  padding?: number;
+  widgets: string[]; // List of Widget IDs (premade or custom)
 }
 
 export interface LayoutFile {
   layoutName: string;
   margin: number;
   panels: PanelDefinition[];
+  stateOverrides?: Partial<Record<GameSimulationState, { enabled: boolean; panels: PanelDefinition[] }>>;
 }
 
 export const DEFAULT_LAYOUT: LayoutFile = {
@@ -46,52 +43,83 @@ export const DEFAULT_LAYOUT: LayoutFile = {
   panels: [
     {
       id: "top_bar",
+      name: "Top Navigation Bar",
       anchor: "TOP_BAR",
       fixedHeight: 38.0,
       backgroundColor: "bgHeader",
       borderColor: "borderNormal",
-      widgets: ["TOP_STATUS_BAR"],
+      layoutDirection: "HORIZONTAL",
+      gap: 8,
+      padding: 6,
+      widgets: ["widget_top_bar_full"],
     },
     {
       id: "left_pane",
+      name: "Left Character Sheet",
       anchor: "LEFT_SIDEBAR",
       fixedWidth: 320.0,
       minWidth: 260.0,
       maxWidth: 450.0,
       backgroundColor: "bgPanel",
       borderColor: "borderNormal",
-      widgets: ["CHARACTER_OVERVIEW", "STAT_BARS", "PAPERDOLL_SOCKETS"],
+      layoutDirection: "VERTICAL",
+      gap: 6,
+      padding: 6,
+      widgets: [
+        "widget_char_overview",
+        "widget_vitals_gauges",
+        "widget_attributes_table",
+        "widget_anatomy_fluids",
+      ],
     },
     {
       id: "center_pane",
+      name: "Center Active View",
       anchor: "CENTER_FLEX",
       backgroundColor: "bgPanel",
       borderColor: "borderNormal",
+      layoutDirection: "VERTICAL",
+      gap: 8,
+      padding: 8,
       widgets: [
-        "SCENE_NARRATIVE",
-        "INTERACTIVE_SEX",
-        "COMBAT_VIEW",
-        "BACKPACK_INVENTORY",
-        "RESOLUTION_HUB",
+        "widget_narrative_story",
+        "widget_erotic_encounter",
+        "widget_tactical_combat",
+        "widget_inventory_dual",
       ],
     },
     {
       id: "right_pane",
+      name: "Right World & Target",
       anchor: "RIGHT_SIDEBAR",
       fixedWidth: 300.0,
       minWidth: 240.0,
       maxWidth: 400.0,
       backgroundColor: "bgPanel",
       borderColor: "borderNormal",
-      widgets: ["MINIMAP_RADAR", "TARGET_INSPECTOR"],
+      layoutDirection: "VERTICAL",
+      gap: 6,
+      padding: 6,
+      widgets: ["widget_minimap_radar"],
     },
     {
       id: "bottom_action_grid",
+      name: "Bottom Action Commands",
       anchor: "BOTTOM_BAR",
       fixedHeight: 140.0,
       backgroundColor: "bgPanel",
       borderColor: "borderNormal",
-      widgets: ["ACTION_GRID"],
+      layoutDirection: "VERTICAL",
+      gap: 4,
+      padding: 6,
+      widgets: ["widget_action_commands"],
     },
   ],
+  stateOverrides: {
+    EXPLORATION: { enabled: false, panels: [] },
+    SCENE: { enabled: false, panels: [] },
+    SEX: { enabled: false, panels: [] },
+    COMBAT: { enabled: false, panels: [] },
+    INVENTORY: { enabled: false, panels: [] },
+  },
 };

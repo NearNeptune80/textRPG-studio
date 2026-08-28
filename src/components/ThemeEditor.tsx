@@ -1,6 +1,6 @@
 import React from "react";
-import { ThemeFile, ThemeColors, RGBAColor, hexToRgba, rgbaToHex } from "../types/theme";
-import { Palette, Type, Sliders } from "lucide-react";
+import { ThemeFile, ThemeColors, RGBAColor, GaugeStyle, hexToRgba, rgbaToHex } from "../types/theme";
+import { Palette, Type, Sliders, Sparkles, Shield } from "lucide-react";
 
 interface ThemeEditorProps {
   theme: ThemeFile;
@@ -74,25 +74,87 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({ theme, onChange }) => 
   };
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto pr-2 space-y-5">
-      {/* Theme Header & Font Settings */}
+    <div className="h-full flex flex-col overflow-y-auto pr-2 space-y-4 select-none">
+      {/* Aesthetics & Styling Rules */}
       <div className="bg-[#1c1a24] p-4 rounded-xl border border-white/10 space-y-3">
         <div className="flex items-center gap-2 text-purple-400 font-semibold text-sm">
-          <Sliders className="w-4 h-4" />
-          <span>General Theme Properties</span>
+          <Sparkles className="w-4 h-4" />
+          <span>Visual Aesthetics & Frame Styling</span>
         </div>
-        <div>
-          <label className="text-xs text-slate-400 block mb-1">Theme Display Name</label>
-          <input
-            type="text"
-            value={theme.themeName}
-            onChange={(e) => onChange({ ...theme, themeName: e.target.value })}
-            className="w-full px-3 py-1.5 bg-black/40 border border-white/10 rounded text-sm text-slate-100"
-          />
+
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <label className="text-slate-400 block mb-1">Corner Radius (px)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0"
+                max="16"
+                value={theme.borderRadius}
+                onChange={(e) => onChange({ ...theme, borderRadius: parseInt(e.target.value) || 0 })}
+                className="flex-1 accent-purple-500"
+              />
+              <span className="w-8 font-mono text-slate-200">{theme.borderRadius}px</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-slate-400 block mb-1">Border Width (px)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="1"
+                max="4"
+                value={theme.borderWidth}
+                onChange={(e) => onChange({ ...theme, borderWidth: parseInt(e.target.value) || 1 })}
+                className="flex-1 accent-purple-500"
+              />
+              <span className="w-8 font-mono text-slate-200">{theme.borderWidth}px</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <label className="text-slate-400 block mb-1">Gauge Bar Render Style</label>
+            <select
+              value={theme.gaugeStyle}
+              onChange={(e) => onChange({ ...theme, gaugeStyle: e.target.value as GaugeStyle })}
+              className="w-full px-2.5 py-1.5 bg-black/40 border border-white/10 rounded text-slate-200 font-medium"
+            >
+              <option value="SOLID">Solid Clean</option>
+              <option value="STRIPED">Striped Modern</option>
+              <option value="SEGMENTED">Segmented Blocks</option>
+              <option value="GLOW">Neon Glow</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-slate-400 block mb-1">Panel Opacity (%)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="30"
+                max="100"
+                value={theme.panelOpacity}
+                onChange={(e) => onChange({ ...theme, panelOpacity: parseInt(e.target.value) || 100 })}
+                className="flex-1 accent-purple-500"
+              />
+              <span className="w-8 font-mono text-slate-200">{theme.panelOpacity}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Font Configuration */}
+      <div className="bg-[#1c1a24] p-4 rounded-xl border border-white/10 space-y-3">
+        <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
+          <Type className="w-4 h-4" />
+          <span>TrueType Typography</span>
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">
-            <label className="text-xs text-slate-400 block mb-1">Custom TTF Font Path</label>
+            <label className="text-xs text-slate-400 block mb-1">Font File Path</label>
             <input
               type="text"
               value={theme.fontPath || ""}
@@ -102,7 +164,7 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({ theme, onChange }) => 
             />
           </div>
           <div>
-            <label className="text-xs text-slate-400 block mb-1">Base Size (pt)</label>
+            <label className="text-xs text-slate-400 block mb-1">Base Size</label>
             <input
               type="number"
               value={theme.baseFontSize || 14}
@@ -134,7 +196,7 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({ theme, onChange }) => 
       {/* Borders & Frames */}
       <div className="bg-[#1c1a24] p-4 rounded-xl border border-white/10 space-y-2">
         <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm mb-2">
-          <Palette className="w-4 h-4" />
+          <Shield className="w-4 h-4" />
           <span>Borders & Frame Outlines</span>
         </div>
         {renderColorRow("borderNormal", "Default Panel Border")}
@@ -159,7 +221,7 @@ export const ThemeEditor: React.FC<ThemeEditorProps> = ({ theme, onChange }) => 
       {/* Vitals & Stat Gauges */}
       <div className="bg-[#1c1a24] p-4 rounded-xl border border-white/10 space-y-2">
         <div className="flex items-center gap-2 text-rose-400 font-semibold text-sm mb-2">
-          <Palette className="w-4 h-4" />
+          <Sliders className="w-4 h-4" />
           <span>Vitals, Gauges & Attributes</span>
         </div>
         {renderColorRow("health", "Health Bar (HP)")}

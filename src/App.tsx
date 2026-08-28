@@ -1,18 +1,25 @@
 import React, { useState } from "react";
 import { ThemeFile, DEFAULT_DARK_FANTASY_THEME } from "./types/theme";
-import { LayoutFile, DEFAULT_LAYOUT } from "./types/layout";
+import { LayoutFile, DEFAULT_LAYOUT, GameSimulationState } from "./types/layout";
+import { CustomWidgetDefinition, PREMADE_WIDGETS } from "./types/elements";
 import { ThemeEditor } from "./components/ThemeEditor";
 import { LayoutEditor } from "./components/LayoutEditor";
 import { GamePreviewViewport } from "./components/GamePreviewViewport";
 import { Palette, LayoutGrid, Download, Upload, Sparkles, Copy, Check } from "lucide-react";
 
-type ActiveTab = "THEME" | "LAYOUT" | "SPLIT";
+type ActiveTab = "THEME" | "LAYOUT";
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<ThemeFile>(DEFAULT_DARK_FANTASY_THEME);
   const [layout, setLayout] = useState<LayoutFile>(DEFAULT_LAYOUT);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("THEME");
+  const [availableWidgets, setAvailableWidgets] = useState<CustomWidgetDefinition[]>(PREMADE_WIDGETS);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("LAYOUT");
+  const [activeSimulationState, setActiveSimulationState] = useState<GameSimulationState>("UNIVERSAL");
   const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
+
+  const handleAddCustomWidget = (newWidget: CustomWidgetDefinition) => {
+    setAvailableWidgets([...availableWidgets, newWidget]);
+  };
 
   const exportThemeJson = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(theme, null, 2));
@@ -36,7 +43,7 @@ export const App: React.FC = () => {
 
   const copyToClipboard = (content: object, label: string) => {
     navigator.clipboard.writeText(JSON.stringify(content, null, 2));
-    setCopiedNotification(`${label} copied to clipboard!`);
+    setCopiedNotification(`${label} JSON copied to clipboard!`);
     setTimeout(() => setCopiedNotification(null), 2500);
   };
 
@@ -69,21 +76,12 @@ export const App: React.FC = () => {
           </div>
           <div>
             <h1 className="font-bold text-sm text-slate-100 tracking-wide">textRPG Studio</h1>
-            <p className="text-[11px] text-purple-400 font-medium">Theme & Responsive Layout Designer</p>
+            <p className="text-[11px] text-purple-400 font-medium">Modular Theme & Responsive Layout Designer</p>
           </div>
         </div>
 
         {/* Studio View Mode Switcher */}
         <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-xs">
-          <button
-            onClick={() => setActiveTab("THEME")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition ${
-              activeTab === "THEME" ? "bg-purple-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <Palette className="w-3.5 h-3.5" />
-            <span>Theme Palette</span>
-          </button>
           <button
             onClick={() => setActiveTab("LAYOUT")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition ${
@@ -91,7 +89,16 @@ export const App: React.FC = () => {
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Layout Builder</span>
+            <span>Layout & Widgets</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("THEME")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition ${
+              activeTab === "THEME" ? "bg-purple-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>Theme Aesthetics</span>
           </button>
         </div>
 
@@ -104,7 +111,12 @@ export const App: React.FC = () => {
           </label>
 
           <button
-            onClick={() => copyToClipboard(activeTab === "THEME" ? theme : layout, activeTab === "THEME" ? "Theme" : "Layout")}
+            onClick={() =>
+              copyToClipboard(
+                activeTab === "THEME" ? theme : layout,
+                activeTab === "THEME" ? "Theme" : "Layout"
+              )
+            }
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg border border-white/10 transition"
           >
             <Copy className="w-3.5 h-3.5" />
@@ -132,17 +144,30 @@ export const App: React.FC = () => {
       {/* Main Workspace (Left Inspector + Right Live Mockup) */}
       <main className="flex-1 flex overflow-hidden p-4 gap-4">
         {/* Left Side: Active Editor */}
-        <section className="w-[420px] shrink-0 h-full flex flex-col">
+        <section className="w-[450px] shrink-0 h-full flex flex-col">
           {activeTab === "THEME" ? (
             <ThemeEditor theme={theme} onChange={setTheme} />
           ) : (
-            <LayoutEditor layout={layout} onChange={setLayout} />
+            <LayoutEditor
+              layout={layout}
+              onChange={setLayout}
+              availableWidgets={availableWidgets}
+              onAddCustomWidget={handleAddCustomWidget}
+              activeEditingState={activeSimulationState}
+              onSelectEditingState={setActiveSimulationState}
+            />
           )}
         </section>
 
         {/* Right Side: Live Game Viewport Preview */}
         <section className="flex-1 h-full flex flex-col min-w-0">
-          <GamePreviewViewport theme={theme} layout={layout} />
+          <GamePreviewViewport
+            theme={theme}
+            layout={layout}
+            availableWidgets={availableWidgets}
+            activeState={activeSimulationState}
+            onSelectState={setActiveSimulationState}
+          />
         </section>
       </main>
     </div>
