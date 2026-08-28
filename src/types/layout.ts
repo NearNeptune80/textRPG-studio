@@ -4,7 +4,11 @@ export type GameSimulationState =
   | "SCENE"
   | "SEX"
   | "COMBAT"
-  | "INVENTORY";
+  | "INVENTORY"
+  | "MAIN_MENU"
+  | "SETTINGS"
+  | "TRANSFORMATION"
+  | "SHOP";
 
 export type ContainerDirection = "ROW" | "COLUMN";
 
@@ -49,6 +53,10 @@ export const BLANK_LAYOUT: LayoutFile = {
     SEX: { enabled: false, rootNode: { id: "box_sex", type: "LEAF", widgets: [] } },
     COMBAT: { enabled: false, rootNode: { id: "box_combat", type: "LEAF", widgets: [] } },
     INVENTORY: { enabled: false, rootNode: { id: "box_inv", type: "LEAF", widgets: [] } },
+    MAIN_MENU: { enabled: false, rootNode: { id: "box_menu", type: "LEAF", widgets: [] } },
+    SETTINGS: { enabled: false, rootNode: { id: "box_settings", type: "LEAF", widgets: [] } },
+    TRANSFORMATION: { enabled: false, rootNode: { id: "box_tf", type: "LEAF", widgets: [] } },
+    SHOP: { enabled: false, rootNode: { id: "box_shop", type: "LEAF", widgets: [] } },
   },
 };
 

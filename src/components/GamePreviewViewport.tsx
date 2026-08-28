@@ -39,7 +39,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   secondarySelectedBoxId,
   onSelectSecondaryBoxId,
 }) => {
-  const [resolution, setResolution] = useState<"HD" | "FHD" | "ULTRAWIDE">("HD");
   const [activeHoverNodeId, setActiveHoverNodeId] = useState<string | null>(null);
   const [activeSplitZone, setActiveSplitZone] = useState<DropSplitZone>(null);
   const [draggedWidgetIndex, setDraggedWidgetIndex] = useState<{ nodeId: string; index: number } | null>(null);
@@ -622,28 +621,39 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   return (
     <div className="h-full flex flex-col space-y-2.5 select-none overflow-hidden font-sans">
       {/* Simulation Viewport Controls & Equalize Action */}
-      <div className="flex items-center justify-between bg-[#1c1a24] px-4 py-2 rounded-xl border border-white/10 text-xs shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-semibold">Test State:</span>
-          {(["UNIVERSAL", "EXPLORATION", "SCENE", "SEX", "COMBAT", "INVENTORY"] as GameSimulationState[]).map(
-            (st) => (
-              <button
-                key={st}
-                onClick={() => onSelectState(st)}
-                className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
-                  activeState === st
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "bg-black/30 text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                {st}
-              </button>
-            )
-          )}
+      <div className="flex items-center justify-between bg-[#1c1a24] px-4 py-2 rounded-xl border border-white/10 text-xs shrink-0 overflow-x-auto gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-slate-400 font-semibold text-[11px]">Scene Preview:</span>
+          {(
+            [
+              "UNIVERSAL",
+              "EXPLORATION",
+              "SCENE",
+              "SEX",
+              "COMBAT",
+              "INVENTORY",
+              "MAIN_MENU",
+              "SETTINGS",
+              "TRANSFORMATION",
+              "SHOP",
+            ] as GameSimulationState[]
+          ).map((st) => (
+            <button
+              key={st}
+              onClick={() => onSelectState(st)}
+              className={`px-2 py-1 rounded-lg transition font-medium text-[11px] shrink-0 ${
+                activeState === st
+                  ? "bg-purple-600 text-white shadow-sm font-bold"
+                  : "bg-black/30 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {st}
+            </button>
+          ))}
         </div>
 
-        {/* Global Split Equalizer & Resolution Controls */}
-        <div className="flex items-center gap-2">
+        {/* Global Split Equalizer */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleEqualizeAll}
             className="flex items-center gap-1.5 px-3 py-1 bg-black/40 hover:bg-purple-950/60 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
@@ -652,40 +662,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
             <Scale className="w-3.5 h-3.5" />
             <span>Equalize All Splits</span>
           </button>
-
-          <div className="h-4 w-px bg-white/10 mx-1" />
-
-          <span className="text-slate-400">Resolution:</span>
-          <button
-            onClick={() => setResolution("HD")}
-            className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
-              resolution === "HD"
-                ? "bg-purple-600 text-white shadow-sm"
-                : "bg-black/30 text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            1280x720 (16:9)
-          </button>
-          <button
-            onClick={() => setResolution("FHD")}
-            className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
-              resolution === "FHD"
-                ? "bg-purple-600 text-white shadow-sm"
-                : "bg-black/30 text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            1920x1080 (16:9)
-          </button>
-          <button
-            onClick={() => setResolution("ULTRAWIDE")}
-            className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
-              resolution === "ULTRAWIDE"
-                ? "bg-purple-600 text-white shadow-sm"
-                : "bg-black/30 text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            21:9 Ultrawide
-          </button>
         </div>
       </div>
 
@@ -693,9 +669,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       <div className="flex-1 min-h-0 overflow-hidden flex items-center justify-center p-2">
         {/* Snapped Game Canvas (Strictly locked in place & aspect ratio) */}
         <div
-          className={`w-full h-full rounded-xl overflow-hidden border shadow-2xl relative transition-all p-2 flex flex-col ${
-            resolution === "ULTRAWIDE" ? "aspect-[21/9]" : "aspect-[16/9]"
-          }`}
+          className="w-full h-full rounded-xl overflow-hidden border shadow-2xl relative transition-all p-2 flex flex-col aspect-[16/9]"
           style={{
             backgroundColor: colorToCss(colors.bgDark),
             borderColor: colorToCss(colors.borderNormal),

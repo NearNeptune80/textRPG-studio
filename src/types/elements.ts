@@ -9,6 +9,8 @@ export type AtomicElementType =
   | "STAT_ATTRIBUTES_LIST"
   | "ANATOMY_FLUID_SUMMARY"
   | "PAPERDOLL_EQUIPMENT_GRID"
+  | "ITEM_DETAILS_INSPECTOR"
+  | "INVENTORY_FILTER_TABS"
   | "MINIMAP_RADAR"
   | "TARGET_INSPECTOR"
   | "CYOA_STORY_VIEW"
@@ -23,6 +25,19 @@ export type AtomicElementType =
   | "TIME_DATE_BANNER"
   | "CURRENCY_GOLD_COUNTER"
   | "LOCATION_MAP_BADGE"
+  | "MAIN_MENU_HERO"
+  | "MAIN_MENU_ACTIONS"
+  | "SAVE_SLOTS_BROWSER"
+  | "OPTIONS_CONTENT_TOGGLES"
+  | "OPTIONS_DEMOGRAPHICS_SLIDERS"
+  | "OPTIONS_AUDIO_DISPLAY"
+  | "BODY_MUTATIONS_TREE"
+  | "ACTIVE_ENCHANTMENTS_LIST"
+  | "ENCHANTING_ALTAR_GRID"
+  | "MERCHANT_PORTRAIT_DIALOG"
+  | "MERCHANT_SHOP_CATALOG"
+  | "PLAYER_SELL_GRID"
+  | "TRANSACTION_CART_SUMMARY"
   | "CUSTOM_TEXT_LABEL";
 
 export interface AtomicElementConfig {
@@ -111,7 +126,7 @@ export const PREMADE_WIDGETS: CustomWidgetDefinition[] = [
   },
   {
     id: "widget_minimap_radar",
-    name: "9x9 World Map Radar",
+    name: "7x7 World Map Radar",
     description: "Tile grid showing player position, walls, doors, and warps",
     isPremade: true,
     layoutDirection: "VERTICAL",
@@ -174,6 +189,36 @@ export const PREMADE_WIDGETS: CustomWidgetDefinition[] = [
     ],
   },
   {
+    id: "widget_paperdoll_equipment",
+    name: "Paperdoll Equipment Grid",
+    description: "Interactive equipment slots for head, chest, weapons, accessories",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 6,
+    elements: [{ id: "e_paperdoll", type: "PAPERDOLL_EQUIPMENT_GRID" }],
+  },
+  {
+    id: "widget_item_details_inspector",
+    name: "Item Details & Lore Inspector",
+    description: "Item name, type, stats, description, and action commands",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 6,
+    elements: [{ id: "e_item_info", type: "ITEM_DETAILS_INSPECTOR" }],
+  },
+  {
+    id: "widget_inventory_filters",
+    name: "Inventory Category Tabs",
+    description: "Filter items by All, Weapons, Armor, Usable, TF, and Quest items",
+    isPremade: true,
+    layoutDirection: "HORIZONTAL",
+    gap: 4,
+    padding: 4,
+    elements: [{ id: "e_inv_filters", type: "INVENTORY_FILTER_TABS" }],
+  },
+  {
     id: "widget_action_commands",
     name: "Action Command Grid",
     description: "5x2 Command action buttons with pagination controls",
@@ -182,5 +227,135 @@ export const PREMADE_WIDGETS: CustomWidgetDefinition[] = [
     gap: 4,
     padding: 6,
     elements: [{ id: "e_actions", type: "ACTION_COMMANDS_GRID" }],
+  },
+  {
+    id: "widget_main_menu_hero",
+    name: "Main Menu Title & Hero Banner",
+    description: "Game title, stylized subtitle, version, and background aesthetic",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 8,
+    padding: 12,
+    elements: [{ id: "e_mm_hero", type: "MAIN_MENU_HERO" }],
+  },
+  {
+    id: "widget_main_menu_actions",
+    name: "Main Menu Action Buttons",
+    description: "New Game, Continue, Load Save, Settings, and Quit",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_mm_actions", type: "MAIN_MENU_ACTIONS" }],
+  },
+  {
+    id: "widget_save_slot_list",
+    name: "Save Slots & Profiles Browser",
+    description: "Interactive save files list with character level, area, and timestamp",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_saves", type: "SAVE_SLOTS_BROWSER" }],
+  },
+  {
+    id: "widget_options_content",
+    name: "Content & Kink Configuration",
+    description: "Pregnancy, Lactation, Fluid Multipliers, and Transformation speed toggles",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_opt_content", type: "OPTIONS_CONTENT_TOGGLES" }],
+  },
+  {
+    id: "widget_options_demographics",
+    name: "Demographics & Sexuality Sliders",
+    description: "World population gender and orientation percentage sliders",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_opt_demo", type: "OPTIONS_DEMOGRAPHICS_SLIDERS" }],
+  },
+  {
+    id: "widget_options_display_audio",
+    name: "Display & Audio Settings",
+    description: "Active Theme, Active Layout selector, and volume controls",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_opt_display", type: "OPTIONS_AUDIO_DISPLAY" }],
+  },
+  {
+    id: "widget_body_mutations_tree",
+    name: "Body Mutations & Anatomy Tree",
+    description: "Interactive mutation tree showing horns, wings, tail, genitals, and corruptions",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_tf_tree", type: "BODY_MUTATIONS_TREE" }],
+  },
+  {
+    id: "widget_active_enchantments_list",
+    name: "Active Enchantments & Blessings",
+    description: "List of active magical enchantments, runic infusions, and corruption curses",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 6,
+    elements: [{ id: "e_tf_ench", type: "ACTIVE_ENCHANTMENTS_LIST" }],
+  },
+  {
+    id: "widget_enchanting_altar",
+    name: "Runic Enchanting Altar",
+    description: "Infuse equipment with mystical essences, runes, and transformative gems",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_altar", type: "ENCHANTING_ALTAR_GRID" }],
+  },
+  {
+    id: "widget_merchant_dialog",
+    name: "Merchant Greeting & Dialog",
+    description: "Merchant NPC portrait, name, disposition, and flavor dialogue",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_shop_dialog", type: "MERCHANT_PORTRAIT_DIALOG" }],
+  },
+  {
+    id: "widget_merchant_catalog",
+    name: "Merchant Goods Catalog",
+    description: "List of items for sale with prices, stock count, and buy buttons",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 6,
+    elements: [{ id: "e_shop_catalog", type: "MERCHANT_SHOP_CATALOG" }],
+  },
+  {
+    id: "widget_player_sell_grid",
+    name: "Player Selling Grid",
+    description: "Player backpack items with sell values and quick-sell buttons",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 6,
+    elements: [{ id: "e_shop_sell", type: "PLAYER_SELL_GRID" }],
+  },
+  {
+    id: "widget_transaction_cart",
+    name: "Shopping Cart & Checkout",
+    description: "Summary of items to buy/sell, net gold change, and confirm checkout button",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [{ id: "e_shop_cart", type: "TRANSACTION_CART_SUMMARY" }],
   },
 ];

@@ -399,27 +399,39 @@ export const LayoutEditor: React.FC<LayoutEditorProps> = ({
         </div>
 
         {/* State Selector Tabs */}
-        <div className="grid grid-cols-3 gap-1 text-[11px]">
-          {(["UNIVERSAL", "EXPLORATION", "SCENE", "SEX", "COMBAT", "INVENTORY"] as GameSimulationState[]).map(
-            (st) => {
-              const isSelected = activeEditingState === st;
-              const hasCustomOverride = st !== "UNIVERSAL" && layout.stateOverrides?.[st]?.enabled;
+        <div className="grid grid-cols-5 gap-1 text-[10px]">
+          {(
+            [
+              "UNIVERSAL",
+              "EXPLORATION",
+              "SCENE",
+              "SEX",
+              "COMBAT",
+              "INVENTORY",
+              "MAIN_MENU",
+              "SETTINGS",
+              "TRANSFORMATION",
+              "SHOP",
+            ] as GameSimulationState[]
+          ).map((st) => {
+            const isSelected = activeEditingState === st;
+            const hasCustomOverride = st !== "UNIVERSAL" && layout.stateOverrides?.[st]?.enabled;
 
-              return (
-                <button
-                  key={st}
-                  onClick={() => onSelectEditingState(st)}
-                  className={`py-1 px-1.5 rounded-lg font-medium transition text-center truncate border ${
-                    isSelected
-                      ? "bg-purple-600 border-purple-400 text-white shadow-sm"
-                      : "bg-black/30 border-white/5 text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  {st} {hasCustomOverride && "★"}
-                </button>
-              );
-            }
-          )}
+            return (
+              <button
+                key={st}
+                onClick={() => onSelectEditingState(st)}
+                className={`py-1 px-1 rounded-lg font-medium transition text-center truncate border ${
+                  isSelected
+                    ? "bg-purple-600 border-purple-400 text-white shadow-sm font-bold"
+                    : "bg-black/30 border-white/5 text-slate-400 hover:text-slate-200"
+                }`}
+                title={st}
+              >
+                {st} {hasCustomOverride && "★"}
+              </button>
+            );
+          })}
         </div>
 
         {isOverrideActive && (
