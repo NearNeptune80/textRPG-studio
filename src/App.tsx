@@ -17,6 +17,10 @@ export const App: React.FC = () => {
   const [activeSimulationState, setActiveSimulationState] = useState<GameSimulationState>("UNIVERSAL");
   const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
 
+  // Selected Box State (Links Canvas with Left-Side Inspector)
+  const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
+  const [secondarySelectedBoxId, setSecondarySelectedBoxId] = useState<string | null>(null);
+
   const handleAddCustomWidget = (newWidget: CustomWidgetDefinition) => {
     setAvailableWidgets([...availableWidgets, newWidget]);
   };
@@ -141,10 +145,10 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Main Workspace (Left Inspector + Right Live Mockup) */}
+      {/* Main Workspace (Left Sidebar/Inspector + Right Static Live Mockup) */}
       <main className="flex-1 flex overflow-hidden p-4 gap-4">
-        {/* Left Side: Active Editor */}
-        <section className="w-[420px] shrink-0 h-full flex flex-col">
+        {/* Left Side: Active Editor & Docked Box Inspector */}
+        <section className="w-[430px] shrink-0 h-full flex flex-col min-h-0 overflow-hidden">
           {activeTab === "THEME" ? (
             <ThemeEditor theme={theme} onChange={setTheme} />
           ) : (
@@ -155,12 +159,16 @@ export const App: React.FC = () => {
               onAddCustomWidget={handleAddCustomWidget}
               activeEditingState={activeSimulationState}
               onSelectEditingState={setActiveSimulationState}
+              selectedBoxId={selectedBoxId}
+              onSelectBoxId={setSelectedBoxId}
+              secondarySelectedBoxId={secondarySelectedBoxId}
+              onSelectSecondaryBoxId={setSecondarySelectedBoxId}
             />
           )}
         </section>
 
-        {/* Right Side: Live Game Viewport Preview */}
-        <section className="flex-1 h-full flex flex-col min-w-0">
+        {/* Right Side: Live Game Viewport Preview (100% Fixed & Completely Visible) */}
+        <section className="flex-1 h-full flex flex-col min-w-0 min-h-0 overflow-hidden">
           <GamePreviewViewport
             theme={theme}
             layout={layout}
@@ -168,10 +176,15 @@ export const App: React.FC = () => {
             availableWidgets={availableWidgets}
             activeState={activeSimulationState}
             onSelectState={setActiveSimulationState}
+            selectedBoxId={selectedBoxId}
+            onSelectBoxId={setSelectedBoxId}
+            secondarySelectedBoxId={secondarySelectedBoxId}
+            onSelectSecondaryBoxId={setSecondarySelectedBoxId}
           />
         </section>
       </main>
     </div>
   );
 };
+
 export default App;
