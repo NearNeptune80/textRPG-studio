@@ -750,42 +750,58 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
           <span className="text-slate-400">Resolution:</span>
           <button
             onClick={() => setResolution("HD")}
-            className={`px-2 py-1 rounded ${resolution === "HD" ? "bg-white/15 text-white" : "text-slate-400"}`}
+            className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
+              resolution === "HD"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-black/30 text-slate-400 hover:text-slate-200"
+            }`}
           >
-            1280x720
+            1280x720 (16:9)
           </button>
           <button
             onClick={() => setResolution("FHD")}
-            className={`px-2 py-1 rounded ${resolution === "FHD" ? "bg-white/15 text-white" : "text-slate-400"}`}
+            className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
+              resolution === "FHD"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-black/30 text-slate-400 hover:text-slate-200"
+            }`}
           >
-            1920x1080
+            1920x1080 (16:9)
           </button>
           <button
             onClick={() => setResolution("ULTRAWIDE")}
-            className={`px-2 py-1 rounded ${resolution === "ULTRAWIDE" ? "bg-white/15 text-white" : "text-slate-400"}`}
+            className={`px-2.5 py-1 rounded-lg transition font-medium text-xs ${
+              resolution === "ULTRAWIDE"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-black/30 text-slate-400 hover:text-slate-200"
+            }`}
           >
-            21:9
+            21:9 Ultrawide
           </button>
         </div>
       </div>
 
-      {/* Main Canvas & Box Options Side-Inspector */}
-      <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
-        {/* Snapped Game Canvas */}
+      {/* Main Canvas Viewport Area with Non-Shifting Canvas */}
+      <div className="flex-1 min-h-0 overflow-hidden relative flex items-center justify-center p-1">
+        {/* Snapped Game Canvas (Strictly locked in place & aspect ratio) */}
         <div
-          className="flex-1 rounded-xl overflow-hidden border shadow-2xl relative transition-all min-h-0 p-2 flex flex-col"
+          className={`w-full h-full rounded-xl overflow-hidden border shadow-2xl relative transition-all p-2 flex flex-col ${
+            resolution === "ULTRAWIDE" ? "aspect-[21/9]" : "aspect-[16/9]"
+          }`}
           style={{
             backgroundColor: colorToCss(colors.bgDark),
             borderColor: colorToCss(colors.borderNormal),
             borderWidth: borderW,
+            maxHeight: "100%",
+            maxWidth: "100%",
           }}
         >
           {renderLayoutNode(rootNode)}
         </div>
 
-        {/* Floating Box Options Drawer (Appears when box is selected) */}
+        {/* Floating Overlay Box Options Drawer (Overlays cleanly without pushing or shifting the game canvas) */}
         {selectedNode && (
-          <div className="w-80 bg-[#1c1a24] rounded-xl border border-purple-500/40 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto shrink-0 animate-in slide-in-from-right-4 duration-200">
+          <div className="absolute top-4 right-4 bottom-4 w-80 bg-[#1c1a24]/95 backdrop-blur-md rounded-xl border border-purple-500/50 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto z-50 animate-in slide-in-from-right-4 duration-200">
             {/* Popover Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center gap-2">
