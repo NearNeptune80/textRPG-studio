@@ -102,101 +102,112 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     return [];
   };
 
-  // Calculate effective fractional width and height of a node
-  const getNodeEffectiveFraction = (root: LayoutNode, targetId: string): { widthFraction: number; heightFraction: number } => {
-    let wf = 1.0;
-    let hf = 1.0;
+  // Calculate the absolute fractions (width and height) of all leaf nodes in the tree
+  const computeAllLeafFractions = (root: LayoutNode): Map<string, { w: number; h: number }> => {
+    const map = new Map<string, { w: number; h: number }>();
 
-    const traverse = (node: LayoutNode) => {
-      if (node.id === targetId) return;
+    const traverse = (node: LayoutNode, currentW: number, currentH: number) => {
+      if (node.type === "LEAF") {
+        map.set(node.id, { w: currentW, h: currentH });
+        return;
+      }
       if (node.type === "SPLIT" && node.children) {
         const r = node.splitRatio ?? 0.5;
-        if (containsNode(node.children[0], targetId)) {
-          if (node.direction === "HORIZONTAL") wf *= r;
-          if (node.direction === "VERTICAL") hf *= r;
-          traverse(node.children[0]);
-        } else if (containsNode(node.children[1], targetId)) {
-          if (node.direction === "HORIZONTAL") wf *= (1.0 - r);
-          if (node.direction === "VERTICAL") hf *= (1.0 - r);
-          traverse(node.children[1]);
+        if (node.direction === "HORIZONTAL") {
+          traverse(node.children[0], currentW * r, currentH);
+          traverse(node.children[1], currentW * (1 - r), currentH);
+        } else {
+          traverse(node.children[0], currentW, currentH * r);
+          traverse(node.children[1], currentW, currentH * (1 - r));
         }
       }
     };
 
-    traverse(root);
-    return { widthFraction: wf, heightFraction: hf };
+    traverse(root, 1.0, 1.0);
+    return map;
   };
 
-  // Find the immediate directional split ancestor of Box 2 that controls its dimension
-  const findDirectionalAncestorSplit = (
+  // Set the absolute dimension of Box 2 to targetValue while preserving Box 1
+  const setLeafAbsoluteDimension = (
     root: LayoutNode,
     targetId: string,
-    requiredDir: SplitDirection
-  ): { splitNodeId: string; isChild0: boolean; availableFraction: number } | null => {
-    let result: { splitNodeId: string; isChild0: boolean; availableFraction: number } | null = null;
-    let currentAvail = 1.0;
-
-    const traverse = (node: LayoutNode) => {
-      if (node.id === targetId) return;
-      if (node.type === "SPLIT" && node.children) {
-        const isReq = node.direction === requiredDir;
-        const r = node.splitRatio ?? 0.5;
-
-        if (containsNode(node.children[0], targetId)) {
-          if (isReq) {
-            result = { splitNodeId: node.id, isChild0: true, availableFraction: currentAvail };
-            currentAvail *= r;
-          }
-          traverse(node.children[0]);
-        } else if (containsNode(node.children[1], targetId)) {
-          if (isReq) {
-            result = { splitNodeId: node.id, isChild0: false, availableFraction: currentAvail };
-            currentAvail *= (1.0 - r);
-          }
-          traverse(node.children[1]);
-        }
-      }
-    };
-
-    traverse(root);
-    return result;
-  };
-
-  // Apply Dimension of Box 1 (reference) onto Box 2 (target)
-  const applySizeOfFirstToSecond = (
-    root: LayoutNode,
-    idFirst: string,
-    idSecond: string,
+    targetValue: number,
     dimension: "WIDTH" | "HEIGHT"
   ): LayoutNode => {
-    const requiredDir: SplitDirection = dimension === "WIDTH" ? "HORIZONTAL" : "VERTICAL";
+    const reqDir: SplitDirection = dimension === "WIDTH" ? "HORIZONTAL" : "VERTICAL";
 
-    // 1. Get reference dimension from Box 1
-    const refFractions = getNodeEffectiveFraction(root, idFirst);
-    const targetSize = dimension === "WIDTH" ? refFractions.widthFraction : refFractions.heightFraction;
+    const hasInnerSplitInDirection = (node: LayoutNode, tId: string, dir: SplitDirection): boolean => {
+      if (node.type === "LEAF" || !node.children) return false;
+      if (node.direction === dir) return true;
+      if (containsNode(node.children[0], tId)) return hasInnerSplitInDirection(node.children[0], tId, dir);
+      if (containsNode(node.children[1], tId)) return hasInnerSplitInDirection(node.children[1], tId, dir);
+      return false;
+    };
 
-    // 2. Find controlling ancestor split for Box 2
-    const targetAncestor = findDirectionalAncestorSplit(root, idSecond, requiredDir);
-    if (!targetAncestor) return root;
+    const updateTree = (node: LayoutNode, availableDim: number): LayoutNode => {
+      if (node.type === "LEAF") return node;
+      if (node.type === "SPLIT" && node.children) {
+        const isReq = node.direction === reqDir;
+        const r = node.splitRatio ?? 0.5;
 
-    const { splitNodeId, isChild0, availableFraction } = targetAncestor;
-    if (availableFraction <= 0.001) return root;
+        const inChild0 = containsNode(node.children[0], targetId);
+        const inChild1 = containsNode(node.children[1], targetId);
 
-    // 3. Compute new ratio strictly for that direction
-    const desiredFractionInParent = targetSize / availableFraction;
-    let newRatio = isChild0 ? desiredFractionInParent : 1.0 - desiredFractionInParent;
+        if (!inChild0 && !inChild1) return node;
 
-    // 4. Guardrails: clamp between 0.05 and 0.95
-    newRatio = Math.max(0.05, Math.min(0.95, Math.round(newRatio * 1000) / 1000));
+        if (isReq) {
+          const deeperHasReq = inChild0
+            ? hasInnerSplitInDirection(node.children[0], targetId, reqDir)
+            : hasInnerSplitInDirection(node.children[1], targetId, reqDir);
 
-    return updateNodeInTree(root, splitNodeId, (n) => ({
-      ...n,
-      splitRatio: newRatio,
-    }));
+          if (!deeperHasReq) {
+            let fractionInThisSplit = targetValue / availableDim;
+            fractionInThisSplit = Math.max(0.05, Math.min(0.95, fractionInThisSplit));
+
+            const newRatio = inChild0 ? fractionInThisSplit : 1.0 - fractionInThisSplit;
+            const roundedRatio = Math.round(newRatio * 1000) / 1000;
+
+            return {
+              ...node,
+              splitRatio: roundedRatio,
+            };
+          }
+        }
+
+        if (inChild0) {
+          const nextAvail = isReq ? availableDim * r : availableDim;
+          return {
+            ...node,
+            children: [
+              updateTree(node.children[0], nextAvail),
+              node.children[1],
+            ],
+          };
+        } else {
+          const nextAvail = isReq ? availableDim * (1 - r) : availableDim;
+          return {
+            ...node,
+            children: [
+              node.children[0],
+              updateTree(node.children[1], nextAvail),
+            ],
+          };
+        }
+      }
+      return node;
+    };
+
+    return updateTree(root, 1.0);
   };
 
   const handleMakeBoxesEqual = (idReference: string, idTarget: string, dim: "WIDTH" | "HEIGHT") => {
-    updateRootNode(applySizeOfFirstToSecond(rootNode, idReference, idTarget, dim));
+    const fractions = computeAllLeafFractions(rootNode);
+    const refData = fractions.get(idReference);
+    if (!refData) return;
+
+    const targetVal = dim === "WIDTH" ? refData.w : refData.h;
+    const nextTree = setLeafAbsoluteDimension(rootNode, idTarget, targetVal, dim);
+    updateRootNode(nextTree);
   };
 
   // Find Parent Split Node
@@ -774,7 +785,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                 <span>Match Size with Another Box</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-tight">
-                Select any other box in your layout (or Shift+Click it on the canvas) to make both boxes identical in width or height:
+                Select any other box in your layout (or Shift+Click it on the canvas) to make it match this box's size:
               </p>
 
               {/* Target Box Selector */}
@@ -802,7 +813,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                 <div className="space-y-2 pt-1">
                   <div className="flex flex-col gap-1 text-[11px] bg-purple-950/40 p-2.5 rounded-lg border border-purple-500/20 text-purple-200">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">1. Reference:</span>
+                      <span className="text-slate-400">1. Reference (Unchanged):</span>
                       <span className="font-semibold text-purple-300">{selectedNode.name || selectedNode.id}</span>
                     </div>
                     <div className="flex justify-between">
@@ -813,19 +824,15 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "WIDTH")}
-                      className="py-2 px-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition text-center flex flex-col items-center justify-center leading-tight"
-                      title="Make Target Box take the exact width of Reference Box"
+                      className="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition text-center"
                     >
-                      <span>Match Width</span>
-                      <span className="text-[10px] text-purple-200 font-normal">(Heights untouched)</span>
+                      Match Width
                     </button>
                     <button
                       onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "HEIGHT")}
-                      className="py-2 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition text-center flex flex-col items-center justify-center leading-tight"
-                      title="Make Target Box take the exact height of Reference Box"
+                      className="py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition text-center"
                     >
-                      <span>Match Height</span>
-                      <span className="text-[10px] text-indigo-200 font-normal">(Widths untouched)</span>
+                      Match Height
                     </button>
                   </div>
                 </div>
