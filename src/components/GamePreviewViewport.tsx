@@ -3,7 +3,7 @@ import { ThemeFile, colorToCss } from "../types/theme";
 import { LayoutFile, GameSimulationState, PanelDefinition } from "../types/layout";
 import { CustomWidgetDefinition } from "../types/elements";
 import { AtomicElementRenderer } from "./AtomicElementRenderer";
-import { Trash2, Plus, ArrowUp, ArrowDown, Layers } from "lucide-react";
+import { Trash2, Plus, ArrowUp, ArrowDown, Layers, Columns, Rows, X } from "lucide-react";
 
 interface GamePreviewViewportProps {
   theme: ThemeFile;
@@ -52,18 +52,96 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     }
   };
 
-  const topPanel = activePanels.find((p) => p.anchor === "TOP_BAR");
-  const bottomPanel = activePanels.find((p) => p.anchor === "BOTTOM_BAR");
-  const leftPanel = activePanels.find((p) => p.anchor === "LEFT_SIDEBAR");
-  const rightPanel = activePanels.find((p) => p.anchor === "RIGHT_SIDEBAR");
-  const centerPanel = activePanels.find((p) => p.anchor === "CENTER_FLEX");
+  // Group panels into Top Rows, Middle Columns, and Bottom Rows
+  const topPanels = activePanels.filter((p) => p.anchor === "TOP_BAR");
+  const bottomPanels = activePanels.filter((p) => p.anchor === "BOTTOM_BAR");
+  const middlePanels = activePanels.filter(
+    (p) => p.anchor === "LEFT_SIDEBAR" || p.anchor === "CENTER_FLEX" || p.anchor === "RIGHT_SIDEBAR"
+  );
 
-  const topHeight = topPanel?.fixedHeight || 38;
-  const bottomHeight = bottomPanel?.fixedHeight || 140;
-  const leftWidth = leftPanel?.fixedWidth || 320;
-  const rightWidth = rightPanel?.fixedWidth || 300;
+  // Add / Delete Box Helpers
+  const handleAddBox = (type: "TOP" | "MIDDLE" | "BOTTOM") => {
+    const id = `box_${Date.now() % 10000}`;
+    let newPanel: PanelDefinition;
 
-  // Drag & Drop Handlers
+    if (type === "TOP") {
+      newPanel = {
+        id,
+        name: `Top Bar ${topPanels.length + 1}`,
+        anchor: "TOP_BAR",
+        fixedHeight: 65,
+        backgroundColor: "bgHeader",
+        borderColor: "borderNormal",
+        layoutDirection: "HORIZONTAL",
+        widgets: [],
+      };
+    } else if (type === "BOTTOM") {
+      newPanel = {
+        id,
+        name: `Bottom Bar ${bottomPanels.length + 1}`,
+        anchor: "BOTTOM_BAR",
+        fixedHeight: 140,
+        backgroundColor: "bgPanel",
+        borderColor: "borderNormal",
+        layoutDirection: "VERTICAL",
+        widgets: [],
+      };
+    } else {
+      newPanel = {
+        id,
+        name: `Middle Box ${middlePanels.length + 1}`,
+        anchor: middlePanels.length === 0 ? "CENTER_FLEX" : "LEFT_SIDEBAR",
+        fixedWidth: 280,
+        backgroundColor: "bgPanel",
+        borderColor: "borderNormal",
+        layoutDirection: "VERTICAL",
+        widgets: [],
+      };
+    }
+
+    updatePanels([...activePanels, newPanel]);
+  };
+
+  const handleDeleteBox = (panelId: string) => {
+    if (confirm("Delete this box container?")) {
+      updatePanels(activePanels.filter((p) => p.id !== panelId));
+    }
+  };
+
+  // Interactive Border Drag Resizers
+  const startHorizontalResize = (panelId: string, currentHeight: number, startY: number, isTop: boolean) => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientY - startY;
+      const nextHeight = Math.max(36, Math.min(500, isTop ? currentHeight + delta : currentHeight - delta));
+      updatePanels(
+        activePanels.map((p) => (p.id === panelId ? { ...p, fixedHeight: nextHeight } : p))
+      );
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const startVerticalResize = (panelId: string, currentWidth: number, startX: number, isLeft: boolean) => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startX;
+      const nextWidth = Math.max(140, Math.min(800, isLeft ? currentWidth + delta : currentWidth - delta));
+      updatePanels(
+        activePanels.map((p) => (p.id === panelId ? { ...p, fixedWidth: nextWidth } : p))
+      );
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
+  // Drag & Drop Handlers for Widgets
   const handlePanelDragOver = (e: React.DragEvent, panelId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
@@ -72,8 +150,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     }
   };
 
-  const handlePanelDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
+  const handlePanelDragLeave = () => {
     setDragOverPanelId(null);
   };
 
@@ -83,13 +160,11 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
     const widgetId = e.dataTransfer.getData("text/plain");
 
-    // Moving widget from one panel/index to another
     if (draggedWidgetIndex) {
       const { panelId: srcPanelId, index: srcIndex } = draggedWidgetIndex;
       setDraggedWidgetIndex(null);
 
       if (srcPanelId === panelId) {
-        // Reordering within the same panel
         const targetIdx = insertIndex !== undefined ? insertIndex : activePanels.find(p => p.id === panelId)!.widgets.length;
         const nextPanels = activePanels.map((p) => {
           if (p.id === panelId) {
@@ -103,7 +178,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
         updatePanels(nextPanels);
         return;
       } else {
-        // Moving across panels
         const nextPanels = activePanels.map((p) => {
           if (p.id === srcPanelId) {
             const nextWidgets = [...p.widgets];
@@ -123,7 +197,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       }
     }
 
-    // Dropping fresh widget from library
     if (!widgetId) return;
 
     const nextPanels = activePanels.map((p) => {
@@ -189,8 +262,8 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     updatePanels(nextPanels);
   };
 
-  // Helper to render widgets inside a scrollable panel
-  const renderPanelDropContent = (panel: PanelDefinition) => {
+  // Render Panel Box Content with Scroll and Drop
+  const renderPanelBox = (panel: PanelDefinition) => {
     const isDragHover = dragOverPanelId === panel.id;
 
     return (
@@ -198,12 +271,12 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
         onDragOver={(e) => handlePanelDragOver(e, panel.id)}
         onDragLeave={handlePanelDragLeave}
         onDrop={(e) => handlePanelDrop(e, panel.id)}
-        className="h-full w-full flex flex-col justify-start relative select-none"
+        className="h-full w-full flex flex-col justify-start relative select-none overflow-hidden"
       >
-        {/* Panel Header & Quick-Add Bar */}
-        <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-white/5 shrink-0">
+        {/* Panel Action Header */}
+        <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-white/5 shrink-0 px-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
               {panel.name || panel.id}
             </span>
             <span className="text-[9px] px-1 py-0.2 rounded bg-black/40 text-purple-300 font-mono">
@@ -211,50 +284,59 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
             </span>
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => setActivePickerPanelId(activePickerPanelId === panel.id ? null : panel.id)}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/40 hover:bg-purple-950 text-[10px] text-purple-300 border border-white/5 transition"
-              title="Add widget from list"
-            >
-              <Plus className="w-2.5 h-2.5" />
-              <span>Add</span>
-            </button>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button
+                onClick={() => setActivePickerPanelId(activePickerPanelId === panel.id ? null : panel.id)}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/40 hover:bg-purple-950 text-[10px] text-purple-300 border border-white/5 transition"
+                title="Add widget"
+              >
+                <Plus className="w-2.5 h-2.5" />
+                <span>Add</span>
+              </button>
 
-            {/* Quick Picker Popup */}
-            {activePickerPanelId === panel.id && (
-              <div className="absolute right-0 top-6 w-56 max-h-64 overflow-y-auto bg-[#221f2d] border border-purple-500/40 rounded-xl shadow-2xl z-50 p-2 space-y-1">
-                <div className="text-[10px] font-bold text-purple-300 px-2 py-1 uppercase tracking-wider">
-                  Pick Widget to Add:
+              {/* Quick Picker Popup */}
+              {activePickerPanelId === panel.id && (
+                <div className="absolute right-0 top-6 w-56 max-h-64 overflow-y-auto bg-[#221f2d] border border-purple-500/40 rounded-xl shadow-2xl z-50 p-2 space-y-1">
+                  <div className="text-[10px] font-bold text-purple-300 px-2 py-1 uppercase tracking-wider">
+                    Pick Widget to Add:
+                  </div>
+                  {availableWidgets.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => handleAddWidgetDirectly(panel.id, w.id)}
+                      className="w-full text-left p-1.5 rounded-lg hover:bg-purple-600/30 text-xs text-slate-200 flex items-center justify-between group transition"
+                    >
+                      <span className="truncate">{w.name}</span>
+                      <Plus className="w-3 h-3 text-purple-400 opacity-0 group-hover:opacity-100 shrink-0" />
+                    </button>
+                  ))}
                 </div>
-                {availableWidgets.map((w) => (
-                  <button
-                    key={w.id}
-                    onClick={() => handleAddWidgetDirectly(panel.id, w.id)}
-                    className="w-full text-left p-1.5 rounded-lg hover:bg-purple-600/30 text-xs text-slate-200 flex items-center justify-between group transition"
-                  >
-                    <span className="truncate">{w.name}</span>
-                    <Plus className="w-3 h-3 text-purple-400 opacity-0 group-hover:opacity-100 shrink-0" />
-                  </button>
-                ))}
-              </div>
-            )}
+              )}
+            </div>
+
+            <button
+              onClick={() => handleDeleteBox(panel.id)}
+              className="p-1 text-slate-500 hover:text-rose-400 rounded transition"
+              title="Delete Box"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
         </div>
 
-        {/* Scrollable Widget Container */}
+        {/* Scrollable Content Container */}
         <div
           className={`flex-1 w-full overflow-y-auto overflow-x-hidden pr-0.5 flex ${
-            panel.layoutDirection === "HORIZONTAL" ? "flex-row items-start flex-wrap" : "flex-col"
+            panel.layoutDirection === "HORIZONTAL" ? "flex-row items-center flex-wrap" : "flex-col"
           } gap-2 rounded transition-all min-h-0 ${
             isDragHover ? "ring-2 ring-purple-500/50 bg-purple-950/20" : ""
           }`}
         >
           {panel.widgets.length === 0 ? (
-            <div className="h-full flex-1 min-h-[80px] flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed border-white/10 text-slate-500 hover:border-purple-500/40 hover:text-purple-300 transition-all text-center">
-              <Plus className="w-4 h-4 text-purple-400 mb-1" />
-              <span className="text-xs font-semibold">Drop Widgets Here</span>
-              <span className="text-[10px] text-slate-500">Drag from library or click "+ Add"</span>
+            <div className="h-full flex-1 min-h-[50px] flex flex-col items-center justify-center p-3 rounded-lg border-2 border-dashed border-white/10 text-slate-500 hover:border-purple-500/40 hover:text-purple-300 transition-all text-center">
+              <Plus className="w-3.5 h-3.5 text-purple-400 mb-0.5" />
+              <span className="text-[11px] font-semibold">Drop Widgets Here</span>
             </div>
           ) : (
             <>
@@ -270,7 +352,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                       e.dataTransfer.setData("text/plain", wId);
                       setDraggedWidgetIndex({ panelId: panel.id, index: idx });
                     }}
-                    className="relative group/widget p-2.5 rounded-xl bg-black/35 border border-white/10 hover:border-purple-500/40 transition shadow-sm w-full shrink-0"
+                    className="relative group/widget p-2 rounded-xl bg-black/35 border border-white/10 hover:border-purple-500/40 transition shadow-sm w-full shrink-0"
                   >
                     {/* Widget Action Bar */}
                     <div className="flex items-center justify-between mb-1 pb-1 border-b border-white/5">
@@ -299,7 +381,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                         <button
                           onClick={() => handleRemoveWidget(panel.id, idx)}
                           className="p-0.5 text-slate-400 hover:text-rose-400"
-                          title="Remove from panel"
+                          title="Remove widget"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -327,14 +409,14 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                 );
               })}
 
-              {/* Auxiliary Drop Bar at the Bottom */}
+              {/* Bottom Quick Drop Slot */}
               <div
                 onDragOver={(e) => handlePanelDragOver(e, panel.id)}
                 onDragLeave={handlePanelDragLeave}
                 onDrop={(e) => handlePanelDrop(e, panel.id)}
-                className="w-full py-2 flex items-center justify-center rounded border border-dashed border-white/5 hover:border-purple-500/40 text-[10px] text-slate-500 hover:text-purple-300 transition shrink-0"
+                className="w-full py-1.5 flex items-center justify-center rounded border border-dashed border-white/5 hover:border-purple-500/40 text-[10px] text-slate-500 hover:text-purple-300 transition shrink-0"
               >
-                + Drop another widget here
+                + Drop another widget
               </div>
             </>
           )}
@@ -345,10 +427,10 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
   return (
     <div className="h-full flex flex-col space-y-3 select-none overflow-hidden">
-      {/* Simulation Viewport Controls */}
+      {/* Simulation Viewport Controls & Add Box Bar */}
       <div className="flex items-center justify-between bg-[#1c1a24] px-4 py-2 rounded-xl border border-white/10 text-xs shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-semibold">Test State Viewport:</span>
+          <span className="text-slate-400 font-semibold">Test State:</span>
           {(["UNIVERSAL", "EXPLORATION", "SCENE", "SEX", "COMBAT", "INVENTORY"] as GameSimulationState[]).map(
             (st) => (
               <button
@@ -364,6 +446,31 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
               </button>
             )
           )}
+        </div>
+
+        {/* Box Creation Controls */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => handleAddBox("TOP")}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-black/40 hover:bg-purple-950/60 border border-white/10 text-slate-300 hover:text-purple-300 text-[11px] font-medium transition"
+          >
+            <Rows className="w-3 h-3 text-purple-400" />
+            <span>+ Top Box</span>
+          </button>
+          <button
+            onClick={() => handleAddBox("MIDDLE")}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-black/40 hover:bg-purple-950/60 border border-white/10 text-slate-300 hover:text-purple-300 text-[11px] font-medium transition"
+          >
+            <Columns className="w-3 h-3 text-purple-400" />
+            <span>+ Middle Column Box</span>
+          </button>
+          <button
+            onClick={() => handleAddBox("BOTTOM")}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-black/40 hover:bg-purple-950/60 border border-white/10 text-slate-300 hover:text-purple-300 text-[11px] font-medium transition"
+          >
+            <Rows className="w-3 h-3 text-purple-400" />
+            <span>+ Bottom Box</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -384,12 +491,12 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
             onClick={() => setResolution("ULTRAWIDE")}
             className={`px-2 py-1 rounded ${resolution === "ULTRAWIDE" ? "bg-white/15 text-white" : "text-slate-400"}`}
           >
-            21:9 Ultrawide
+            21:9
           </button>
         </div>
       </div>
 
-      {/* Live Game Frame Mockup Canvas */}
+      {/* Live Game Mockup Canvas */}
       <div
         className="flex-1 w-full rounded-xl overflow-hidden border shadow-2xl flex flex-col p-2 relative font-sans transition-all min-h-0"
         style={{
@@ -398,87 +505,108 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
           borderWidth: borderW,
         }}
       >
-        {/* Top Status Bar Panel */}
-        {topPanel && (
-          <div
-            className="w-full flex items-center px-3 py-1 border mb-1.5 transition-all overflow-hidden shrink-0"
-            style={{
-              height: `${topHeight}px`,
-              backgroundColor: colorToCss(colors.bgHeader, opacity),
-              borderColor: colorToCss(colors.borderNormal),
-              borderRadius: radius,
-              borderWidth: borderW,
-            }}
-          >
-            {renderPanelDropContent(topPanel)}
-          </div>
-        )}
+        {/* Top Boxes List */}
+        {topPanels.map((p) => {
+          const currentH = p.fixedHeight || 65;
+          return (
+            <React.Fragment key={p.id}>
+              <div
+                className="w-full border mb-1.5 p-2 flex flex-col transition-all overflow-hidden shrink-0"
+                style={{
+                  height: `${currentH}px`,
+                  backgroundColor: colorToCss(colors.bgHeader, opacity),
+                  borderColor: colorToCss(colors.borderNormal),
+                  borderRadius: radius,
+                  borderWidth: borderW,
+                }}
+              >
+                {renderPanelBox(p)}
+              </div>
+              {/* Horizontal Resizing Divider Line */}
+              <div
+                onMouseDown={(e) => startHorizontalResize(p.id, currentH, e.clientY, true)}
+                className="w-full h-1.5 cursor-row-resize hover:bg-purple-500/40 active:bg-purple-500 rounded my-0.5 transition"
+                title="Drag to resize box height"
+              />
+            </React.Fragment>
+          );
+        })}
 
-        {/* Middle Main Content Area */}
-        <div className="flex-1 flex gap-1.5 min-h-0 overflow-hidden">
-          {/* Left Sidebar Panel (Scrollable) */}
-          {leftPanel && (
-            <div
-              className="border p-2.5 flex flex-col transition-all overflow-hidden min-h-0"
-              style={{
-                width: `${leftWidth}px`,
-                backgroundColor: colorToCss(colors.bgPanel, opacity),
-                borderColor: colorToCss(colors.borderNormal),
-                borderRadius: radius,
-                borderWidth: borderW,
-              }}
-            >
-              {renderPanelDropContent(leftPanel)}
+        {/* Middle Columns List (Left, Center, Right, and extra columns) */}
+        <div className="flex-1 flex min-h-0 overflow-hidden relative">
+          {middlePanels.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-xl text-slate-500 p-8">
+              <Columns className="w-8 h-8 text-purple-400 mb-2" />
+              <span className="text-sm font-semibold">No Middle Columns Present</span>
+              <p className="text-xs text-slate-500 mb-3">Add 1 or more middle columns to place widgets</p>
+              <button
+                onClick={() => handleAddBox("MIDDLE")}
+                className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold"
+              >
+                + Add Middle Column
+              </button>
             </div>
-          )}
+          ) : (
+            middlePanels.map((p, idx) => {
+              const isCenterFlex = p.anchor === "CENTER_FLEX";
+              const currentW = p.fixedWidth || 280;
 
-          {/* Center Flex Panel (Scrollable) */}
-          {centerPanel && (
-            <div
-              className="flex-1 border p-3 flex flex-col transition-all overflow-hidden min-h-0"
-              style={{
-                backgroundColor: colorToCss(colors.bgPanel, opacity),
-                borderColor: colorToCss(colors.borderNormal),
-                borderRadius: radius,
-                borderWidth: borderW,
-              }}
-            >
-              {renderPanelDropContent(centerPanel)}
-            </div>
-          )}
+              return (
+                <React.Fragment key={p.id}>
+                  <div
+                    className="border p-2 flex flex-col transition-all overflow-hidden min-h-0"
+                    style={{
+                      flex: isCenterFlex ? 1 : undefined,
+                      width: !isCenterFlex ? `${currentW}px` : undefined,
+                      backgroundColor: colorToCss(colors.bgPanel, opacity),
+                      borderColor: colorToCss(colors.borderNormal),
+                      borderRadius: radius,
+                      borderWidth: borderW,
+                    }}
+                  >
+                    {renderPanelBox(p)}
+                  </div>
 
-          {/* Right Sidebar Panel (Scrollable) */}
-          {rightPanel && (
-            <div
-              className="border p-2.5 flex flex-col transition-all overflow-hidden min-h-0"
-              style={{
-                width: `${rightWidth}px`,
-                backgroundColor: colorToCss(colors.bgPanel, opacity),
-                borderColor: colorToCss(colors.borderNormal),
-                borderRadius: radius,
-                borderWidth: borderW,
-              }}
-            >
-              {renderPanelDropContent(rightPanel)}
-            </div>
+                  {/* Vertical Resizing Divider Line between columns */}
+                  {idx < middlePanels.length - 1 && (
+                    <div
+                      onMouseDown={(e) => startVerticalResize(p.id, currentW, e.clientX, true)}
+                      className="w-1.5 h-full cursor-col-resize hover:bg-purple-500/40 active:bg-purple-500 rounded mx-0.5 transition shrink-0"
+                      title="Drag to resize column width"
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })
           )}
         </div>
 
-        {/* Bottom Action Commands Grid Panel */}
-        {bottomPanel && (
-          <div
-            className="w-full border p-2 flex flex-col justify-between mt-1.5 transition-all shrink-0 overflow-hidden"
-            style={{
-              height: `${bottomHeight}px`,
-              backgroundColor: colorToCss(colors.bgPanel, opacity),
-              borderColor: colorToCss(colors.borderNormal),
-              borderRadius: radius,
-              borderWidth: borderW,
-            }}
-          >
-            {renderPanelDropContent(bottomPanel)}
-          </div>
-        )}
+        {/* Bottom Boxes List */}
+        {bottomPanels.map((p) => {
+          const currentH = p.fixedHeight || 140;
+          return (
+            <React.Fragment key={p.id}>
+              {/* Horizontal Resizing Divider Line */}
+              <div
+                onMouseDown={(e) => startHorizontalResize(p.id, currentH, e.clientY, false)}
+                className="w-full h-1.5 cursor-row-resize hover:bg-purple-500/40 active:bg-purple-500 rounded my-0.5 transition"
+                title="Drag to resize bottom box height"
+              />
+              <div
+                className="w-full border p-2 flex flex-col transition-all shrink-0 overflow-hidden"
+                style={{
+                  height: `${currentH}px`,
+                  backgroundColor: colorToCss(colors.bgPanel, opacity),
+                  borderColor: colorToCss(colors.borderNormal),
+                  borderRadius: radius,
+                  borderWidth: borderW,
+                }}
+              >
+                {renderPanelBox(p)}
+              </div>
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );
