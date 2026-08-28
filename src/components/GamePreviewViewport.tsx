@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ThemeFile, colorToCss } from "../types/theme";
-import { LayoutFile, GameSimulationState, LayoutNode, SplitDirection } from "../types/layout";
+import { LayoutFile, GameSimulationState, LayoutNode, ContainerDirection } from "../types/layout";
 import { CustomWidgetDefinition } from "../types/elements";
 import { AtomicElementRenderer } from "./AtomicElementRenderer";
 import {
@@ -67,27 +67,24 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     }
   };
 
-  // Helper: check if a subtree contains a specific node ID
+  // Tree Helper: Check if a subtree contains a specific node ID
   const containsNode = (node: LayoutNode, targetId: string): boolean => {
     if (node.id === targetId) return true;
-    if (node.type === "SPLIT" && node.children) {
-      return containsNode(node.children[0], targetId) || containsNode(node.children[1], targetId);
+    if (node.type === "CONTAINER" && node.children) {
+      return node.children.some((child) => containsNode(child, targetId));
     }
     return false;
   };
 
-  // Tree Helper: Update a node in the BSP Tree
+  // Tree Helper: Update a node in the Tree
   const updateNodeInTree = (node: LayoutNode, targetId: string, updater: (n: LayoutNode) => LayoutNode): LayoutNode => {
     if (node.id === targetId) {
       return updater(node);
     }
-    if (node.type === "SPLIT" && node.children) {
+    if (node.type === "CONTAINER" && node.children) {
       return {
         ...node,
-        children: [
-          updateNodeInTree(node.children[0], targetId, updater),
-          updateNodeInTree(node.children[1], targetId, updater),
-        ],
+        children: node.children.map((child) => updateNodeInTree(child, targetId, updater)),
       };
     }
     return node;
@@ -96,13 +93,43 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   // Get all leaf boxes currently in the tree
   const getAllLeafBoxes = (node: LayoutNode): LayoutNode[] => {
     if (node.type === "LEAF") return [node];
-    if (node.type === "SPLIT" && node.children) {
-      return [...getAllLeafBoxes(node.children[0]), ...getAllLeafBoxes(node.children[1])];
+    if (node.type === "CONTAINER" && node.children) {
+      return node.children.flatMap((child) => getAllLeafBoxes(child));
     }
     return [];
   };
 
-  // Calculate the absolute fractions (width and height) of all leaf nodes in the tree
+  // Tree Helper: Find Parent Container of a Node
+  const findParentContainer = (
+    current: LayoutNode,
+    targetId: string
+  ): { parentNode: LayoutNode; childIndex: number } | null => {
+    if (current.type === "CONTAINER" && current.children) {
+      const idx = current.children.findIndex((c) => c.id === targetId);
+      if (idx !== -1) {
+        return { parentNode: current, childIndex: idx };
+      }
+      for (const child of current.children) {
+        const found = findParentContainer(child, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Helper: Find leaf node by ID
+  const findNodeById = (node: LayoutNode, id: string): LayoutNode | null => {
+    if (node.id === id) return node;
+    if (node.type === "CONTAINER" && node.children) {
+      for (const child of node.children) {
+        const found = findNodeById(child, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Calculate the effective absolute fractional size (width and height) of all leaf nodes
   const computeAllLeafFractions = (root: LayoutNode): Map<string, { w: number; h: number }> => {
     const map = new Map<string, { w: number; h: number }>();
 
@@ -111,15 +138,16 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
         map.set(node.id, { w: currentW, h: currentH });
         return;
       }
-      if (node.type === "SPLIT" && node.children) {
-        const r = node.splitRatio ?? 0.5;
-        if (node.direction === "HORIZONTAL") {
-          traverse(node.children[0], currentW * r, currentH);
-          traverse(node.children[1], currentW * (1 - r), currentH);
-        } else {
-          traverse(node.children[0], currentW, currentH * r);
-          traverse(node.children[1], currentW, currentH * (1 - r));
-        }
+      if (node.type === "CONTAINER" && node.children && node.sizes) {
+        const totalSize = node.sizes.reduce((a, b) => a + b, 0) || 100;
+        node.children.forEach((child, idx) => {
+          const fraction = (node.sizes![idx] ?? (100 / node.children!.length)) / totalSize;
+          if (node.direction === "ROW") {
+            traverse(child, currentW * fraction, currentH);
+          } else {
+            traverse(child, currentW, currentH * fraction);
+          }
+        });
       }
     };
 
@@ -127,141 +155,131 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     return map;
   };
 
-  // Set the absolute dimension of Box 2 to targetValue while preserving Box 1
-  const setLeafAbsoluteDimension = (
-    root: LayoutNode,
-    targetId: string,
-    targetValue: number,
-    dimension: "WIDTH" | "HEIGHT"
-  ): LayoutNode => {
-    const reqDir: SplitDirection = dimension === "WIDTH" ? "HORIZONTAL" : "VERTICAL";
+  // Match Size of Target Box (idTarget) to Reference Box (idReference)
+  // Box 1 (idReference) remains 100% frozen!
+  const handleMatchDimension = (idReference: string, idTarget: string, dimension: "WIDTH" | "HEIGHT") => {
+    const reqDir: ContainerDirection = dimension === "WIDTH" ? "ROW" : "COLUMN";
 
-    const hasInnerSplitInDirection = (node: LayoutNode, tId: string, dir: SplitDirection): boolean => {
-      if (node.type === "LEAF" || !node.children) return false;
-      if (node.direction === dir) return true;
-      if (containsNode(node.children[0], tId)) return hasInnerSplitInDirection(node.children[0], tId, dir);
-      if (containsNode(node.children[1], tId)) return hasInnerSplitInDirection(node.children[1], tId, dir);
-      return false;
-    };
-
-    const updateTree = (node: LayoutNode, availableDim: number): LayoutNode => {
-      if (node.type === "LEAF") return node;
-      if (node.type === "SPLIT" && node.children) {
-        const isReq = node.direction === reqDir;
-        const r = node.splitRatio ?? 0.5;
-
-        const inChild0 = containsNode(node.children[0], targetId);
-        const inChild1 = containsNode(node.children[1], targetId);
-
-        if (!inChild0 && !inChild1) return node;
-
-        if (isReq) {
-          const deeperHasReq = inChild0
-            ? hasInnerSplitInDirection(node.children[0], targetId, reqDir)
-            : hasInnerSplitInDirection(node.children[1], targetId, reqDir);
-
-          if (!deeperHasReq) {
-            let fractionInThisSplit = targetValue / availableDim;
-            fractionInThisSplit = Math.max(0.05, Math.min(0.95, fractionInThisSplit));
-
-            const newRatio = inChild0 ? fractionInThisSplit : 1.0 - fractionInThisSplit;
-            const roundedRatio = Math.round(newRatio * 1000) / 1000;
-
-            return {
-              ...node,
-              splitRatio: roundedRatio,
-            };
-          }
-        }
-
-        if (inChild0) {
-          const nextAvail = isReq ? availableDim * r : availableDim;
-          return {
-            ...node,
-            children: [
-              updateTree(node.children[0], nextAvail),
-              node.children[1],
-            ],
-          };
-        } else {
-          const nextAvail = isReq ? availableDim * (1 - r) : availableDim;
-          return {
-            ...node,
-            children: [
-              node.children[0],
-              updateTree(node.children[1], nextAvail),
-            ],
-          };
-        }
-      }
-      return node;
-    };
-
-    return updateTree(root, 1.0);
-  };
-
-  const handleMakeBoxesEqual = (idReference: string, idTarget: string, dim: "WIDTH" | "HEIGHT") => {
+    // 1. Get Reference Dimension (unchanged)
     const fractions = computeAllLeafFractions(rootNode);
     const refData = fractions.get(idReference);
     if (!refData) return;
+    const targetAbsSize = dimension === "WIDTH" ? refData.w : refData.h;
 
-    const targetVal = dim === "WIDTH" ? refData.w : refData.h;
-    const nextTree = setLeafAbsoluteDimension(rootNode, idTarget, targetVal, dim);
-    updateRootNode(nextTree);
-  };
+    // 2. Find target's parent container in that direction
+    let currentChildId = idTarget;
+    let targetContainerInfo: { parentNode: LayoutNode; childIndex: number } | null = null;
 
-  // Find Parent Split Node
-  const findParentSplitNode = (current: LayoutNode, targetId: string): LayoutNode | null => {
-    if (current.type === "SPLIT" && current.children) {
-      if (current.children[0].id === targetId || current.children[1].id === targetId) {
-        return current;
+    let searchNode: LayoutNode | null = rootNode;
+    while (searchNode) {
+      const parentInfo = findParentContainer(rootNode, currentChildId);
+      if (!parentInfo) break;
+      if (parentInfo.parentNode.direction === reqDir) {
+        targetContainerInfo = parentInfo;
+        break;
       }
-      const left = findParentSplitNode(current.children[0], targetId);
-      if (left) return left;
-      return findParentSplitNode(current.children[1], targetId);
+      currentChildId = parentInfo.parentNode.id;
     }
-    return null;
-  };
 
-  // Set Split Ratio of Parent
-  const setParentSplitRatio = (boxId: string, desiredFraction: number) => {
-    const parent = findParentSplitNode(rootNode, boxId);
-    if (!parent || !parent.children) return;
+    if (!targetContainerInfo) return;
 
-    const isFirst = parent.children[0].id === boxId;
-    const finalRatio = isFirst ? desiredFraction : 1 - desiredFraction;
+    const { parentNode, childIndex } = targetContainerInfo;
+    if (!parentNode.sizes || !parentNode.children || parentNode.children.length < 2) return;
 
-    const updated = updateNodeInTree(rootNode, parent.id, (n) => ({
+    // Find the available space of this container relative to canvas
+    const containerFractions = computeAllLeafFractions(rootNode);
+    // Find absolute size of the container
+    let containerAbsSize = 1.0;
+    const firstLeafInContainer = getAllLeafBoxes(parentNode)[0];
+    if (firstLeafInContainer) {
+      const leafF = containerFractions.get(firstLeafInContainer.id);
+      const leafFractionInContainer = (parentNode.sizes[0] || 50) / (parentNode.sizes.reduce((a, b) => a + b, 0) || 100);
+      if (leafF && leafFractionInContainer > 0) {
+        containerAbsSize = (dimension === "WIDTH" ? leafF.w : leafF.h) / leafFractionInContainer;
+      }
+    }
+
+    // Desired percentage of target box inside this container
+    const desiredPercent = Math.max(5, Math.min(90, (targetAbsSize / containerAbsSize) * 100));
+    const currentPercent = parentNode.sizes[childIndex];
+    const diff = desiredPercent - currentPercent;
+
+    // Determine neighbor to absorb the difference (prefer previous, otherwise next)
+    const neighborIndex = childIndex > 0 ? childIndex - 1 : childIndex + 1;
+    const neighborCurrent = parentNode.sizes[neighborIndex];
+    const newNeighborPercent = Math.max(5, neighborCurrent - diff);
+    const actualAppliedDiff = neighborCurrent - newNeighborPercent;
+
+    const newSizes = [...parentNode.sizes];
+    newSizes[childIndex] = currentPercent + actualAppliedDiff;
+    newSizes[neighborIndex] = newNeighborPercent;
+
+    const updated = updateNodeInTree(rootNode, parentNode.id, (n) => ({
       ...n,
-      splitRatio: Math.round(finalRatio * 100) / 100,
+      sizes: newSizes,
     }));
+
     updateRootNode(updated);
   };
 
-  // Equalize All Splits Recursively
-  const equalizeAllSplits = (node: LayoutNode): LayoutNode => {
-    if (node.type === "SPLIT" && node.children) {
-      return {
-        ...node,
-        splitRatio: 0.5,
-        children: [
-          equalizeAllSplits(node.children[0]),
-          equalizeAllSplits(node.children[1]),
-        ],
-      };
-    }
-    return node;
+  // Local Two-Box Border Resizing: Dragging the splitter between child i and child i+1
+  const startResizeLocalSplitter = (
+    containerId: string,
+    splitterIndex: number,
+    direction: ContainerDirection,
+    containerElement: HTMLElement
+  ) => {
+    const rect = containerElement.getBoundingClientRect();
+    const parentContainer = findNodeById(rootNode, containerId);
+    if (!parentContainer || !parentContainer.sizes) return;
+
+    const initialSizes = [...parentContainer.sizes];
+    const sumTwo = initialSizes[splitterIndex] + initialSizes[splitterIndex + 1];
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const totalPixels = direction === "ROW" ? rect.width : rect.height;
+      const currentPos = direction === "ROW" ? e.clientX - rect.left : e.clientY - rect.top;
+
+      // Calculate pixel offset before splitterIndex
+      let pixelsBefore = 0;
+      for (let i = 0; i < splitterIndex; i++) {
+        pixelsBefore += (initialSizes[i] / 100) * totalPixels;
+      }
+
+      const localOffset = currentPos - pixelsBefore;
+      const localRatio = Math.max(0.05, Math.min(0.95, localOffset / ((sumTwo / 100) * totalPixels)));
+
+      const newSizeLeft = Math.round(sumTwo * localRatio * 10) / 10;
+      const newSizeRight = Math.round((sumTwo - newSizeLeft) * 10) / 10;
+
+      const nextSizes = [...initialSizes];
+      nextSizes[splitterIndex] = newSizeLeft;
+      nextSizes[splitterIndex + 1] = newSizeRight;
+
+      const updated = updateNodeInTree(rootNode, containerId, (n) => ({
+        ...n,
+        sizes: nextSizes,
+      }));
+      updateRootNode(updated);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
   };
 
-  const handleEqualizeAll = () => {
-    updateRootNode(equalizeAllSplits(rootNode));
-  };
-
-  // Tree Helper: Split a Leaf Node into 2 children
+  // Splitting a Box (Horizontal or Vertical)
   const splitLeafNode = (targetId: string, zone: DropSplitZone) => {
     if (!zone || zone === "CENTER") return;
 
     const isHorizontal = zone === "LEFT" || zone === "RIGHT";
+    const reqDirection: ContainerDirection = isHorizontal ? "ROW" : "COLUMN";
+    const isFirst = zone === "LEFT" || zone === "TOP";
+
     const newEmptyNode: LayoutNode = {
       id: `box_${Date.now() % 10000}_${Math.random().toString(36).substring(2, 4)}`,
       type: "LEAF",
@@ -269,39 +287,79 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       widgets: [],
     };
 
-    const newRoot = updateNodeInTree(rootNode, targetId, (existingNode) => {
-      const isFirst = zone === "LEFT" || zone === "TOP";
-      return {
-        id: `split_${Date.now() % 10000}`,
-        type: "SPLIT",
-        direction: isHorizontal ? "HORIZONTAL" : "VERTICAL",
-        splitRatio: 0.5,
-        children: isFirst
-          ? [newEmptyNode, { ...existingNode }]
-          : [{ ...existingNode }, newEmptyNode],
-      };
-    });
+    // Check if target is already inside a container with the same direction
+    const parentInfo = findParentContainer(rootNode, targetId);
+    if (parentInfo && parentInfo.parentNode.direction === reqDirection) {
+      // Insert alongside target in existing container!
+      const parent = parentInfo.parentNode;
+      const targetIdx = parentInfo.childIndex;
+      const targetOldSize = parent.sizes![targetIdx];
+      const halfSize = Math.round((targetOldSize / 2) * 10) / 10;
 
-    updateRootNode(newRoot);
+      const newChildren = [...parent.children!];
+      const newSizes = [...parent.sizes!];
+
+      newSizes[targetIdx] = halfSize;
+      if (isFirst) {
+        newChildren.splice(targetIdx, 0, newEmptyNode);
+        newSizes.splice(targetIdx, 0, halfSize);
+      } else {
+        newChildren.splice(targetIdx + 1, 0, newEmptyNode);
+        newSizes.splice(targetIdx + 1, 0, halfSize);
+      }
+
+      const updated = updateNodeInTree(rootNode, parent.id, (n) => ({
+        ...n,
+        children: newChildren,
+        sizes: newSizes,
+      }));
+      updateRootNode(updated);
+      return;
+    }
+
+    // Otherwise, wrap the target in a new container of reqDirection with 2 children (50/50)
+    const updated = updateNodeInTree(rootNode, targetId, (existingNode) => ({
+      id: `container_${Date.now() % 10000}`,
+      type: "CONTAINER",
+      direction: reqDirection,
+      sizes: [50, 50],
+      children: isFirst
+        ? [newEmptyNode, { ...existingNode }]
+        : [{ ...existingNode }, newEmptyNode],
+    }));
+
+    updateRootNode(updated);
   };
 
-  // Tree Helper: Close / Remove a Leaf Node (Collapse parent split)
+  // Close / Remove a Box
   const removeNodeFromTree = (current: LayoutNode, targetId: string): LayoutNode | null => {
     if (current.id === targetId) {
       return null;
     }
-    if (current.type === "SPLIT" && current.children) {
-      const leftResult = removeNodeFromTree(current.children[0], targetId);
-      const rightResult = removeNodeFromTree(current.children[1], targetId);
+    if (current.type === "CONTAINER" && current.children) {
+      const newChildren: LayoutNode[] = [];
+      const newSizes: number[] = [];
 
-      if (leftResult === null && rightResult !== null) return rightResult;
-      if (rightResult === null && leftResult !== null) return leftResult;
-      if (leftResult && rightResult) {
-        return {
-          ...current,
-          children: [leftResult, rightResult],
-        };
-      }
+      current.children.forEach((child, idx) => {
+        const res = removeNodeFromTree(child, targetId);
+        if (res !== null) {
+          newChildren.push(res);
+          newSizes.push(current.sizes![idx]);
+        }
+      });
+
+      if (newChildren.length === 0) return null;
+      if (newChildren.length === 1) return newChildren[0]; // Collapse single-child container
+
+      // Normalize remaining sizes to sum to 100
+      const total = newSizes.reduce((a, b) => a + b, 0) || 100;
+      const normalizedSizes = newSizes.map((s) => Math.round((s / total) * 1000) / 10);
+
+      return {
+        ...current,
+        children: newChildren,
+        sizes: normalizedSizes,
+      };
     }
     return current;
   };
@@ -324,37 +382,22 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     }
   };
 
-  // Tree Helper: Update Split Ratio on Drag (Zero-Lag direct calculation)
-  const startResizeSplitter = (
-    splitNodeId: string,
-    direction: SplitDirection,
-    containerElement: HTMLElement
-  ) => {
-    const rect = containerElement.getBoundingClientRect();
-
-    const handleMouseMove = (e: MouseEvent) => {
-      let ratio: number;
-      if (direction === "HORIZONTAL") {
-        ratio = (e.clientX - rect.left) / rect.width;
-      } else {
-        ratio = (e.clientY - rect.top) / rect.height;
-      }
-      ratio = Math.max(0.05, Math.min(0.95, ratio));
-
-      const updated = updateNodeInTree(rootNode, splitNodeId, (node) => ({
+  // Equalize All Container Splits Recursively
+  const equalizeAllSplits = (node: LayoutNode): LayoutNode => {
+    if (node.type === "CONTAINER" && node.children) {
+      const count = node.children.length;
+      const equalSize = Math.round((100 / count) * 10) / 10;
+      return {
         ...node,
-        splitRatio: Math.round(ratio * 1000) / 1000,
-      }));
-      updateRootNode(updated);
-    };
+        sizes: node.children.map(() => equalSize),
+        children: node.children.map((c) => equalizeAllSplits(c)),
+      };
+    }
+    return node;
+  };
 
-    const handleMouseUp = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+  const handleEqualizeAll = () => {
+    updateRootNode(equalizeAllSplits(rootNode));
   };
 
   // Drop handlers for Dragging Boxes and Widgets
@@ -461,70 +504,57 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     updateRootNode(updated);
   };
 
-  // Helper to find leaf node by ID
-  const findNodeById = (node: LayoutNode, id: string): LayoutNode | null => {
-    if (node.id === id) return node;
-    if (node.type === "SPLIT" && node.children) {
-      const left = findNodeById(node.children[0], id);
-      if (left) return left;
-      return findNodeById(node.children[1], id);
-    }
-    return null;
-  };
-
   const allLeafBoxes = getAllLeafBoxes(rootNode);
   const selectedNode = selectedBoxId ? findNodeById(rootNode, selectedBoxId) : null;
   const secondaryNode = secondarySelectedBoxId ? findNodeById(rootNode, secondarySelectedBoxId) : null;
-  const parentSplit = selectedBoxId ? findParentSplitNode(rootNode, selectedBoxId) : null;
 
   // Recursive Tree Node Renderer
   const renderLayoutNode = (node: LayoutNode): React.ReactNode => {
-    if (node.type === "SPLIT" && node.children) {
-      const isHorizontal = node.direction === "HORIZONTAL";
-      const ratio = node.splitRatio ?? 0.5;
+    if (node.type === "CONTAINER" && node.children && node.sizes) {
+      const isRow = node.direction === "ROW";
 
       return (
         <div
           key={node.id}
           className={`h-full w-full flex ${
-            isHorizontal ? "flex-row" : "flex-col"
+            isRow ? "flex-row" : "flex-col"
           } min-h-0 min-w-0 overflow-hidden select-none`}
         >
-          {/* First Child */}
-          <div
-            style={{
-              flex: `${ratio} ${ratio} 0%`,
-            }}
-            className="min-h-0 min-w-0 overflow-hidden flex flex-col"
-          >
-            {renderLayoutNode(node.children[0])}
-          </div>
+          {node.children.map((child, idx) => {
+            const sizePercent = node.sizes![idx] ?? (100 / node.children!.length);
 
-          {/* Interactive Splitter Divider Line */}
-          <div
-            onMouseDown={(e) => {
-              const parent = e.currentTarget.parentElement;
-              if (parent) {
-                startResizeSplitter(node.id, node.direction || "HORIZONTAL", parent);
-              }
-            }}
-            className={`shrink-0 transition-colors z-20 ${
-              isHorizontal
-                ? "w-1.5 h-full cursor-col-resize hover:bg-purple-500 active:bg-purple-400"
-                : "w-full h-1.5 cursor-row-resize hover:bg-purple-500 active:bg-purple-400"
-            }`}
-            title="Drag to resize split"
-          />
+            return (
+              <React.Fragment key={child.id}>
+                {/* Child Container / Box */}
+                <div
+                  style={{
+                    flex: `${sizePercent} ${sizePercent} 0%`,
+                  }}
+                  className="min-h-0 min-w-0 overflow-hidden flex flex-col"
+                >
+                  {renderLayoutNode(child)}
+                </div>
 
-          {/* Second Child */}
-          <div
-            style={{
-              flex: `${1 - ratio} ${1 - ratio} 0%`,
-            }}
-            className="min-h-0 min-w-0 overflow-hidden flex flex-col"
-          >
-            {renderLayoutNode(node.children[1])}
-          </div>
+                {/* Local Splitter Handle between child idx and idx+1 */}
+                {idx < node.children!.length - 1 && (
+                  <div
+                    onMouseDown={(e) => {
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        startResizeLocalSplitter(node.id, idx, node.direction || "ROW", parent);
+                      }
+                    }}
+                    className={`shrink-0 transition-colors z-20 ${
+                      isRow
+                        ? "w-1.5 h-full cursor-col-resize hover:bg-purple-500 active:bg-purple-400"
+                        : "w-full h-1.5 cursor-row-resize hover:bg-purple-500 active:bg-purple-400"
+                    }`}
+                    title="Drag to resize between these 2 boxes only"
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       );
     }
@@ -709,7 +739,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
           <button
             onClick={handleEqualizeAll}
             className="flex items-center gap-1.5 px-3 py-1 bg-black/40 hover:bg-purple-950/60 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
-            title="Reset all splits across the entire layout to 50/50"
+            title="Reset all splits across the entire layout to equal parts"
           >
             <Scale className="w-3.5 h-3.5" />
             <span>Equalize All Splits</span>
@@ -741,7 +771,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
       {/* Main Canvas & Box Options Side-Inspector */}
       <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
-        {/* BSP Tile Snapped Game Canvas */}
+        {/* Snapped Game Canvas */}
         <div
           className="flex-1 rounded-xl overflow-hidden border shadow-2xl relative transition-all min-h-0 p-2 flex flex-col"
           style={{
@@ -753,7 +783,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
           {renderLayoutNode(rootNode)}
         </div>
 
-        {/* Floating Box Options Popover / Drawer (Appears when box is selected) */}
+        {/* Floating Box Options Drawer (Appears when box is selected) */}
         {selectedNode && (
           <div className="w-80 bg-[#1c1a24] rounded-xl border border-purple-500/40 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto shrink-0 animate-in slide-in-from-right-4 duration-200">
             {/* Popover Header */}
@@ -785,7 +815,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                 <span>Match Size with Another Box</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-tight">
-                Select any other box in your layout (or Shift+Click it on the canvas) to make it match this box's size:
+                Select any 2nd box to make it take this box's exact size:
               </p>
 
               {/* Target Box Selector */}
@@ -823,13 +853,13 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "WIDTH")}
+                      onClick={() => handleMatchDimension(selectedNode.id, secondaryNode.id, "WIDTH")}
                       className="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition text-center"
                     >
                       Match Width
                     </button>
                     <button
-                      onClick={() => handleMakeBoxesEqual(selectedNode.id, secondaryNode.id, "HEIGHT")}
+                      onClick={() => handleMatchDimension(selectedNode.id, secondaryNode.id, "HEIGHT")}
                       className="py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition text-center"
                     >
                       Match Height
@@ -838,60 +868,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Direct Sizing & Ratio Presets */}
-            {parentSplit && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Parent Split Presets
-                  </span>
-                  <span className="text-[10px] text-purple-300 font-mono">
-                    {Math.round((parentSplit.splitRatio || 0.5) * 100)}% / {Math.round((1 - (parentSplit.splitRatio || 0.5)) * 100)}%
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5 text-xs">
-                  <button
-                    onClick={() => setParentSplitRatio(selectedNode.id, 0.5)}
-                    className="p-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 font-semibold text-center transition text-[11px]"
-                    title="Make this box exactly equal 50% / 50% with its neighbor"
-                  >
-                    50 / 50 (Equal)
-                  </button>
-                  <button
-                    onClick={() => setParentSplitRatio(selectedNode.id, 0.333)}
-                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
-                  >
-                    33 / 67
-                  </button>
-                  <button
-                    onClick={() => setParentSplitRatio(selectedNode.id, 0.25)}
-                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
-                  >
-                    25 / 75
-                  </button>
-                  <button
-                    onClick={() => setParentSplitRatio(selectedNode.id, 0.20)}
-                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
-                  >
-                    20 / 80
-                  </button>
-                  <button
-                    onClick={() => setParentSplitRatio(selectedNode.id, 0.667)}
-                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
-                  >
-                    67 / 33
-                  </button>
-                  <button
-                    onClick={() => setParentSplitRatio(selectedNode.id, 0.75)}
-                    className="p-1.5 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono text-[11px]"
-                  >
-                    75 / 25
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Quick Split Buttons */}
             <div className="space-y-2">

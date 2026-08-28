@@ -6,20 +6,22 @@ export type GameSimulationState =
   | "COMBAT"
   | "INVENTORY";
 
-export type SplitDirection = "HORIZONTAL" | "VERTICAL";
+export type ContainerDirection = "ROW" | "COLUMN";
 
 /**
- * Binary Space Partitioning (BSP) Tile Node.
- * A node is either a LEAF (contains widgets) or a SPLIT (contains 2 children split horizontally or vertically).
+ * N-Way Multi-Child Layout Node.
+ * - LEAF: A single box containing widgets.
+ * - CONTAINER: An array of child nodes (either ROW = horizontal columns, or COLUMN = vertical rows)
+ *   with an array of percentage sizes (summing to 100%).
  */
 export interface LayoutNode {
   id: string;
-  type: "SPLIT" | "LEAF";
+  type: "CONTAINER" | "LEAF";
   name?: string;
-  direction?: SplitDirection; // HORIZONTAL = Left/Right columns, VERTICAL = Top/Bottom rows
-  splitRatio?: number;        // Fraction from 0.05 to 0.95 (default 0.5)
-  children?: [LayoutNode, LayoutNode];
-  widgets?: string[];         // List of widget IDs inside this leaf box
+  direction?: ContainerDirection; // ROW = horizontal sequence of boxes, COLUMN = vertical sequence of boxes
+  sizes?: number[];              // Percentage sizes of each child (e.g. [20, 60, 20], sums to 100)
+  children?: LayoutNode[];
+  widgets?: string[];            // List of widget IDs inside this leaf box
 }
 
 export interface LayoutFile {
@@ -51,16 +53,16 @@ export const BLANK_LAYOUT: LayoutFile = {
 };
 
 /**
- * Default Populated Lilith textRPG BSP Tile Preset
+ * Default Populated Lilith textRPG Preset
  */
 export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
   layoutName: "Default Lilith RPG Layout",
   margin: 6.0,
   rootNode: {
-    id: "root_split_v",
-    type: "SPLIT",
-    direction: "VERTICAL", // Top Bar vs Body + Bottom Action
-    splitRatio: 0.07,
+    id: "root_column",
+    type: "CONTAINER",
+    direction: "COLUMN",
+    sizes: [8, 72, 20],
     children: [
       {
         id: "top_bar",
@@ -69,62 +71,46 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
         widgets: ["widget_top_bar_full"],
       },
       {
-        id: "body_and_bottom_split",
-        type: "SPLIT",
-        direction: "VERTICAL",
-        splitRatio: 0.78,
+        id: "middle_row",
+        type: "CONTAINER",
+        direction: "ROW",
+        sizes: [25, 50, 25],
         children: [
           {
-            id: "middle_columns_split",
-            type: "SPLIT",
-            direction: "HORIZONTAL", // Left Sidebar vs Center & Right
-            splitRatio: 0.25,
-            children: [
-              {
-                id: "left_sidebar",
-                type: "LEAF",
-                name: "Left Sidebar",
-                widgets: [
-                  "widget_char_overview",
-                  "widget_vitals_gauges",
-                  "widget_attributes_table",
-                  "widget_anatomy_fluids",
-                ],
-              },
-              {
-                id: "center_and_right_split",
-                type: "SPLIT",
-                direction: "HORIZONTAL", // Center Story vs Right Radar
-                splitRatio: 0.66,
-                children: [
-                  {
-                    id: "center_story",
-                    type: "LEAF",
-                    name: "Center Story & Narrative",
-                    widgets: [
-                      "widget_narrative_story",
-                      "widget_erotic_encounter",
-                      "widget_tactical_combat",
-                      "widget_inventory_dual",
-                    ],
-                  },
-                  {
-                    id: "right_sidebar",
-                    type: "LEAF",
-                    name: "Right World & Radar",
-                    widgets: ["widget_minimap_radar"],
-                  },
-                ],
-              },
+            id: "left_sidebar",
+            type: "LEAF",
+            name: "Left Sidebar",
+            widgets: [
+              "widget_char_overview",
+              "widget_vitals_gauges",
+              "widget_attributes_table",
+              "widget_anatomy_fluids",
             ],
           },
           {
-            id: "bottom_actions",
+            id: "center_story",
             type: "LEAF",
-            name: "Bottom Action Commands",
-            widgets: ["widget_action_commands"],
+            name: "Center Story & Narrative",
+            widgets: [
+              "widget_narrative_story",
+              "widget_erotic_encounter",
+              "widget_tactical_combat",
+              "widget_inventory_dual",
+            ],
+          },
+          {
+            id: "right_sidebar",
+            type: "LEAF",
+            name: "Right World & Radar",
+            widgets: ["widget_minimap_radar"],
           },
         ],
+      },
+      {
+        id: "bottom_actions",
+        type: "LEAF",
+        name: "Bottom Action Commands",
+        widgets: ["widget_action_commands"],
       },
     ],
   },
