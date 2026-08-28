@@ -3,7 +3,17 @@ import { ThemeFile, colorToCss } from "../types/theme";
 import { LayoutFile, GameSimulationState, LayoutNode, SplitDirection } from "../types/layout";
 import { CustomWidgetDefinition } from "../types/elements";
 import { AtomicElementRenderer } from "./AtomicElementRenderer";
-import { Trash2, Plus, ArrowUp, ArrowDown, X } from "lucide-react";
+import {
+  Trash2,
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Settings2,
+  Columns,
+  Rows,
+  Scale,
+} from "lucide-react";
 
 interface GamePreviewViewportProps {
   theme: ThemeFile;
@@ -28,6 +38,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
   const [activeHoverNodeId, setActiveHoverNodeId] = useState<string | null>(null);
   const [activeSplitZone, setActiveSplitZone] = useState<DropSplitZone>(null);
   const [draggedWidgetIndex, setDraggedWidgetIndex] = useState<{ nodeId: string; index: number } | null>(null);
+  const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
 
   const colors = theme.colors;
   const radius = `${theme.borderRadius}px`;
@@ -69,6 +80,53 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       };
     }
     return node;
+  };
+
+  // Find Parent Split Node
+  const findParentSplitNode = (current: LayoutNode, targetId: string): LayoutNode | null => {
+    if (current.type === "SPLIT" && current.children) {
+      if (current.children[0].id === targetId || current.children[1].id === targetId) {
+        return current;
+      }
+      const left = findParentSplitNode(current.children[0], targetId);
+      if (left) return left;
+      return findParentSplitNode(current.children[1], targetId);
+    }
+    return null;
+  };
+
+  // Set Split Ratio of Parent
+  const setParentSplitRatio = (boxId: string, desiredFraction: number) => {
+    const parent = findParentSplitNode(rootNode, boxId);
+    if (!parent || !parent.children) return;
+
+    const isFirst = parent.children[0].id === boxId;
+    const finalRatio = isFirst ? desiredFraction : 1 - desiredFraction;
+
+    const updated = updateNodeInTree(rootNode, parent.id, (n) => ({
+      ...n,
+      splitRatio: Math.round(finalRatio * 100) / 100,
+    }));
+    updateRootNode(updated);
+  };
+
+  // Equalize All Splits Recursively
+  const equalizeAllSplits = (node: LayoutNode): LayoutNode => {
+    if (node.type === "SPLIT" && node.children) {
+      return {
+        ...node,
+        splitRatio: 0.5,
+        children: [
+          equalizeAllSplits(node.children[0]),
+          equalizeAllSplits(node.children[1]),
+        ],
+      };
+    }
+    return node;
+  };
+
+  const handleEqualizeAll = () => {
+    updateRootNode(equalizeAllSplits(rootNode));
   };
 
   // Tree Helper: Split a Leaf Node into 2 children
@@ -120,13 +178,14 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     return current;
   };
 
-  const handleCloseBox = (nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCloseBox = (nodeId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (selectedBoxId === nodeId) setSelectedBoxId(null);
+
     const newRoot = removeNodeFromTree(rootNode, nodeId);
     if (newRoot) {
       updateRootNode(newRoot);
     } else {
-      // If closing the last box, reset to 1 empty main box
       updateRootNode({
         id: "box_main",
         type: "LEAF",
@@ -182,7 +241,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       const relX = (e.clientX - rect.left) / rect.width;
       const relY = (e.clientY - rect.top) / rect.height;
 
-      // Determine split zone based on proximity to 4 borders
       if (relY < 0.28) setActiveSplitZone("TOP");
       else if (relY > 0.72) setActiveSplitZone("BOTTOM");
       else if (relX < 0.35) setActiveSplitZone("LEFT");
@@ -212,7 +270,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
     const widgetId = e.dataTransfer.getData("text/plain");
 
-    // Reordering/moving widget between boxes
     if (draggedWidgetIndex) {
       const { nodeId: srcNodeId, index: srcIndex } = draggedWidgetIndex;
       setDraggedWidgetIndex(null);
@@ -239,7 +296,6 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
       return;
     }
 
-    // Adding fresh widget from library
     if (widgetId) {
       const updated = updateNodeInTree(rootNode, node.id, (n) => ({
         ...n,
@@ -275,6 +331,20 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
     });
     updateRootNode(updated);
   };
+
+  // Helper to find leaf node by ID
+  const findNodeById = (node: LayoutNode, id: string): LayoutNode | null => {
+    if (node.id === id) return node;
+    if (node.type === "SPLIT" && node.children) {
+      const left = findNodeById(node.children[0], id);
+      if (left) return left;
+      return findNodeById(node.children[1], id);
+    }
+    return null;
+  };
+
+  const selectedNode = selectedBoxId ? findNodeById(rootNode, selectedBoxId) : null;
+  const parentSplit = selectedBoxId ? findParentSplitNode(rootNode, selectedBoxId) : null;
 
   // Recursive Tree Node Renderer
   const renderLayoutNode = (node: LayoutNode): React.ReactNode => {
@@ -330,30 +400,46 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
     // Leaf Node (Content Box)
     const isDragHover = activeHoverNodeId === node.id;
+    const isSelected = selectedBoxId === node.id;
     const widgets = node.widgets || [];
 
     return (
       <div
         key={node.id}
+        onClick={() => setSelectedBoxId(node.id)}
         onDragOver={(e) => handleBoxDragOver(e, node)}
         onDragLeave={handleBoxDragLeave}
         onDrop={(e) => handleBoxDrop(e, node)}
-        className="h-full w-full border p-2 flex flex-col relative transition-all overflow-hidden group/box min-h-0 min-w-0"
+        className={`h-full w-full border p-2 flex flex-col relative transition-all overflow-hidden group/box min-h-0 min-w-0 cursor-pointer ${
+          isSelected ? "ring-2 ring-purple-500 shadow-lg shadow-purple-500/20" : ""
+        }`}
         style={{
           backgroundColor: colorToCss(colors.bgPanel, opacity),
-          borderColor: colorToCss(colors.borderNormal),
+          borderColor: isSelected ? colorToCss(colors.borderSelected) : colorToCss(colors.borderNormal),
           borderRadius: radius,
           borderWidth: borderW,
         }}
       >
-        {/* Floating Delete Box Button (Top Right corner on hover) */}
-        <button
-          onClick={(e) => handleCloseBox(node.id, e)}
-          className="absolute top-1.5 right-1.5 opacity-0 group-hover/box:opacity-100 p-1 rounded bg-black/85 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-white/10 z-30 transition shadow"
-          title="Close / Collapse this box"
-        >
-          <X className="w-3 h-3" />
-        </button>
+        {/* Floating Quick Action Buttons on Hover */}
+        <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/box:opacity-100 flex items-center gap-1 z-30 transition bg-black/85 px-1.5 py-0.5 rounded border border-white/10 shadow-lg">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedBoxId(node.id);
+            }}
+            className="p-0.5 text-slate-400 hover:text-purple-300"
+            title="Box Options & Sizing"
+          >
+            <Settings2 className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => handleCloseBox(node.id, e)}
+            className="p-0.5 text-slate-400 hover:text-rose-400"
+            title="Close / Collapse box"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
 
         {/* Visual Glowing Split Drop Preview Zone */}
         {isDragHover && activeSplitZone && (
@@ -451,7 +537,7 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
 
   return (
     <div className="h-full flex flex-col space-y-2.5 select-none overflow-hidden font-sans">
-      {/* Simulation Viewport Controls */}
+      {/* Simulation Viewport Controls & Equalize Action */}
       <div className="flex items-center justify-between bg-[#1c1a24] px-4 py-2 rounded-xl border border-white/10 text-xs shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-slate-400 font-semibold">Test State:</span>
@@ -472,7 +558,19 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
           )}
         </div>
 
+        {/* Global Split Equalizer */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleEqualizeAll}
+            className="flex items-center gap-1.5 px-3 py-1 bg-black/40 hover:bg-purple-950/60 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
+            title="Reset all splits to exactly equal 50/50 parts"
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Equalize All Splits</span>
+          </button>
+
+          <div className="h-4 w-px bg-white/10 mx-1" />
+
           <span className="text-slate-400">Resolution:</span>
           <button
             onClick={() => setResolution("HD")}
@@ -495,16 +593,143 @@ export const GamePreviewViewport: React.FC<GamePreviewViewportProps> = ({
         </div>
       </div>
 
-      {/* BSP Tile Snapped Game Canvas */}
-      <div
-        className="flex-1 w-full rounded-xl overflow-hidden border shadow-2xl relative transition-all min-h-0 p-2 flex flex-col"
-        style={{
-          backgroundColor: colorToCss(colors.bgDark),
-          borderColor: colorToCss(colors.borderNormal),
-          borderWidth: borderW,
-        }}
-      >
-        {renderLayoutNode(rootNode)}
+      {/* Main Canvas & Box Options Side-Inspector */}
+      <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
+        {/* BSP Tile Snapped Game Canvas */}
+        <div
+          className="flex-1 rounded-xl overflow-hidden border shadow-2xl relative transition-all min-h-0 p-2 flex flex-col"
+          style={{
+            backgroundColor: colorToCss(colors.bgDark),
+            borderColor: colorToCss(colors.borderNormal),
+            borderWidth: borderW,
+          }}
+        >
+          {renderLayoutNode(rootNode)}
+        </div>
+
+        {/* Floating Box Options Popover / Drawer (Appears when box is selected) */}
+        {selectedNode && (
+          <div className="w-72 bg-[#1c1a24] rounded-xl border border-purple-500/40 p-4 flex flex-col space-y-4 shadow-2xl overflow-y-auto shrink-0 animate-in slide-in-from-right-4 duration-200">
+            {/* Popover Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                  <Settings2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xs text-slate-100">{selectedNode.name || "Box Settings"}</h3>
+                  <span className="text-[10px] text-purple-400 font-mono">ID: {selectedNode.id}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedBoxId(null)}
+                className="p-1 text-slate-400 hover:text-white rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Equal Sizing & Split Ratio Presets */}
+            {parentSplit && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Sizing & Ratio Presets
+                  </span>
+                  <span className="text-[10px] text-purple-300">
+                    {Math.round((parentSplit.splitRatio || 0.5) * 100)}% / {Math.round((1 - (parentSplit.splitRatio || 0.5)) * 100)}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <button
+                    onClick={() => setParentSplitRatio(selectedNode.id, 0.5)}
+                    className="p-2 rounded-lg bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 font-semibold text-center transition"
+                    title="Make this box exactly equal 50% / 50% with its neighbor"
+                  >
+                    50 / 50 (Equal)
+                  </button>
+                  <button
+                    onClick={() => setParentSplitRatio(selectedNode.id, 0.333)}
+                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                  >
+                    33 / 67
+                  </button>
+                  <button
+                    onClick={() => setParentSplitRatio(selectedNode.id, 0.25)}
+                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                  >
+                    25 / 75
+                  </button>
+                  <button
+                    onClick={() => setParentSplitRatio(selectedNode.id, 0.20)}
+                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                  >
+                    20 / 80
+                  </button>
+                  <button
+                    onClick={() => setParentSplitRatio(selectedNode.id, 0.667)}
+                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                  >
+                    67 / 33
+                  </button>
+                  <button
+                    onClick={() => setParentSplitRatio(selectedNode.id, 0.75)}
+                    className="p-2 rounded-lg bg-black/40 hover:bg-purple-950 text-slate-300 hover:text-white border border-white/10 text-center transition font-mono"
+                  >
+                    75 / 25
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Split Buttons */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">
+                Quick Split
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => splitLeafNode(selectedNode.id, "RIGHT")}
+                  className="flex items-center justify-center gap-1.5 p-2 rounded-lg bg-black/40 hover:bg-purple-950/60 border border-white/10 text-slate-200 hover:text-purple-200 text-xs transition"
+                >
+                  <Columns className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Split Vertical</span>
+                </button>
+                <button
+                  onClick={() => splitLeafNode(selectedNode.id, "BOTTOM")}
+                  className="flex items-center justify-center gap-1.5 p-2 rounded-lg bg-black/40 hover:bg-purple-950/60 border border-white/10 text-slate-200 hover:text-purple-200 text-xs transition"
+                >
+                  <Rows className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Split Horizontal</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Box Destruction & Clean Up */}
+            <div className="space-y-2 pt-2 border-t border-white/10">
+              <button
+                onClick={() => {
+                  const updated = updateNodeInTree(rootNode, selectedNode.id, (n) => ({
+                    ...n,
+                    widgets: [],
+                  }));
+                  updateRootNode(updated);
+                }}
+                className="w-full py-1.5 rounded-lg bg-black/40 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-white/5 text-xs transition text-center"
+              >
+                Clear All Widgets
+              </button>
+              <button
+                onClick={() => handleCloseBox(selectedNode.id)}
+                className="w-full py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold transition text-center flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete / Collapse Box</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
