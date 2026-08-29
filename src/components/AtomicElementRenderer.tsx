@@ -394,23 +394,25 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
 
     case "ACTION_COMMANDS_GRID":
       return (
-        <div className="w-full grid grid-cols-5 gap-2">
-          {["Move North (W)", "Move South (S)", "Move West (A)", "Move East (D)", "Talk to NPC", "Inventory (I)", "Visit Shop (K)", "Mutations (M)", "Test Combat (C)", "Pass Turn"].map(
-            (cmd, idx) => (
-              <button
-                key={idx}
-                className="py-2 px-1 rounded text-[11px] font-semibold flex items-center justify-center transition border shadow-sm"
-                style={{
-                  backgroundColor: colorToCss(colors.bgButton),
-                  borderColor: colorToCss(colors.borderButton),
-                  color: colorToCss(colors.textPrimary),
-                  borderRadius: radius,
-                }}
-              >
-                {cmd}
-              </button>
-            )
-          )}
+        <div className="w-full grid grid-cols-5 gap-1.5">
+          {[
+            "Move North (W)", "Move South (S)", "Move West (A)", "Move East (D)", "Wait / Rest",
+            "Talk to NPC", "Examine Ground", "Inventory (I)", "Visit Shop (K)", "Mutations (M)",
+            "Test Combat (C)", "Cast Spells", "Use Item", "Character Sheet", "Pass Turn",
+          ].map((cmd, idx) => (
+            <button
+              key={idx}
+              className="py-1.5 px-1 rounded text-[10px] font-semibold flex items-center justify-center transition border shadow-sm truncate"
+              style={{
+                backgroundColor: colorToCss(colors.bgButton),
+                borderColor: colorToCss(colors.borderButton),
+                color: colorToCss(colors.textPrimary),
+                borderRadius: radius,
+              }}
+            >
+              {cmd}
+            </button>
+          ))}
         </div>
       );
 
