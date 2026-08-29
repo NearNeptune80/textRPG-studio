@@ -7,10 +7,10 @@ import {
   Coins,
   Sparkles,
   Settings,
-  BookOpen,
+  Smartphone,
   Shirt,
   ShoppingBag,
-  Compass,
+  Eye,
 } from "lucide-react";
 
 interface AtomicElementRendererProps {
@@ -67,29 +67,38 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
 
     case "MINIMAP_DPAD_RADAR":
       return (
-        <div className="w-full flex flex-col items-center justify-center p-2 bg-black/40 border border-white/10 rounded my-1" style={{ borderRadius: radius }}>
-          <div className="grid grid-cols-3 gap-1 w-24 h-24">
-            <div />
-            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">W</button>
-            <div />
-            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">A</button>
-            <div className="bg-pink-600/30 border border-pink-500/50 rounded flex items-center justify-center text-[10px] font-bold text-pink-300 shadow">📍</div>
-            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">D</button>
-            <div />
-            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">S</button>
-            <div />
+        <div className="w-full flex flex-col items-center justify-center p-2 bg-black/60 border border-white/10 rounded my-1" style={{ borderRadius: radius }}>
+          <div className="grid grid-cols-5 gap-1 w-28 h-28">
+            {Array.from({ length: 25 }).map((_, idx) => {
+              const r = Math.floor(idx / 5);
+              const c = idx % 5;
+              const isCenter = r === 2 && c === 2;
+              const dist = Math.max(Math.abs(r - 2), Math.abs(c - 2));
+              let tileClass = "bg-[#0a0a0e] border-[#181822]";
+              if (isCenter) tileClass = "bg-cyan-950/80 border-cyan-400 text-cyan-300 font-bold shadow";
+              else if (dist === 1) tileClass = "bg-[#181824] border-[#2a2a3c]";
+
+              return (
+                <div
+                  key={idx}
+                  className={`rounded-[2px] border flex items-center justify-center text-[10px] ${tileClass}`}
+                >
+                  {isCenter ? "@" : ""}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
 
     case "BOTTOM_TOOLSTRIP":
       return (
-        <div className="w-full flex items-center justify-between pt-1 border-t border-white/10">
+        <div className="w-full flex items-center justify-between pt-1 border-t border-white/10 px-1">
           <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Options / Settings">
             <Settings className="w-3.5 h-3.5" />
           </button>
-          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Journal / Encyclopedia">
-            <BookOpen className="w-3.5 h-3.5" />
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-pink-400 transition" title="Phone (Combat Moves, TF, Perks, Journal)">
+            <Smartphone className="w-3.5 h-3.5" />
           </button>
           <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Wardrobe / Clothing">
             <Shirt className="w-3.5 h-3.5" />
@@ -97,8 +106,8 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
           <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Inventory / Backpack">
             <ShoppingBag className="w-3.5 h-3.5" />
           </button>
-          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="World Map">
-            <Compass className="w-3.5 h-3.5" />
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="View Characters Present">
+            <Eye className="w-3.5 h-3.5" />
           </button>
         </div>
       );
