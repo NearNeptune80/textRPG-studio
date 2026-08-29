@@ -36,9 +36,21 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
 
     case "LOCATION_MAP_BADGE":
       return (
-        <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: colorToCss(colors.textAccent) }}>
-          <MapPin className="w-3.5 h-3.5" /> Grand Bazaar
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: colorToCss(colors.textAccent) }}>
+            <MapPin className="w-3.5 h-3.5" /> Grand Bazaar
+          </span>
+          <button
+            className="px-2.5 py-0.5 rounded text-[10px] font-bold border transition shadow-sm bg-black/40 hover:bg-white/10"
+            style={{
+              borderColor: colorToCss(colors.borderButton),
+              color: colorToCss(colors.textGold),
+              borderRadius: radius,
+            }}
+          >
+            ⚙ MENU
+          </button>
+        </div>
       );
 
     case "PLAYER_NAME":
@@ -253,9 +265,9 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
 
     case "CYOA_STORY_VIEW":
       return (
-        <div className="w-full space-y-2 text-xs leading-relaxed" style={{ color: colorToCss(colors.textPrimary) }}>
+        <div className="w-full space-y-3 text-xs leading-relaxed" style={{ color: colorToCss(colors.textPrimary) }}>
           <div
-            className="px-3 py-1.5 font-bold tracking-wider text-xs border"
+            className="px-3 py-1.5 font-bold tracking-wider text-xs border flex items-center justify-between"
             style={{
               backgroundColor: colorToCss(colors.bgHeader),
               borderColor: colorToCss(colors.borderNormal),
@@ -263,12 +275,35 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
               borderRadius: radius,
             }}
           >
-            {activeState === "SCENE" ? "TALKING WITH AMIRA" : "OVERWORLD EXPLORATION"}
+            <span>{activeState === "SCENE" ? "TALKING WITH AMIRA" : activeState === "SEX" ? "EROTIC ENCOUNTER" : "OVERWORLD EXPLORATION"}</span>
+            <span className="text-[10px] opacity-70">Scene Active</span>
           </div>
           <p>
             You explore the cobblestone courtyard of Lilith's District. Arcane street lamps flicker with lavender
             magical light. Merchants, succubi, and travelers wander the lively avenue.
           </p>
+          <div className="space-y-1.5 pt-1">
+            <div className="text-[11px] font-semibold tracking-wide" style={{ color: colorToCss(colors.textGold) }}>
+              STORY CHOICES:
+            </div>
+            {[
+              "[1] Talk to Madame Selene at the apothecary stall",
+              "[2] Follow the hooded stranger down the shadowed alley",
+              "[3] Rest near the fountain to recover vitality",
+            ].map((choice, idx) => (
+              <button
+                key={idx}
+                className="w-full text-left px-3 py-1.5 rounded text-[11px] font-medium border transition shadow-sm bg-black/30 hover:bg-white/10"
+                style={{
+                  borderColor: colorToCss(colors.borderNormal),
+                  color: colorToCss(colors.textPrimary),
+                  borderRadius: radius,
+                }}
+              >
+                {choice}
+              </button>
+            ))}
+          </div>
         </div>
       );
 
@@ -360,11 +395,11 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
     case "ACTION_COMMANDS_GRID":
       return (
         <div className="w-full grid grid-cols-5 gap-2">
-          {["North", "South", "East", "West", "Rest", "Talk", "Inventory", "Shop", "Spells", "Pass"].map(
+          {["Move North (W)", "Move South (S)", "Move West (A)", "Move East (D)", "Talk to NPC", "Inventory (I)", "Visit Shop (K)", "Mutations (M)", "Test Combat (C)", "Pass Turn"].map(
             (cmd, idx) => (
               <button
                 key={idx}
-                className="py-2 px-1 rounded text-xs font-semibold flex items-center justify-center transition border shadow-sm"
+                className="py-2 px-1 rounded text-[11px] font-semibold flex items-center justify-center transition border shadow-sm"
                 style={{
                   backgroundColor: colorToCss(colors.bgButton),
                   borderColor: colorToCss(colors.borderButton),
