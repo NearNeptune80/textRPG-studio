@@ -276,34 +276,12 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
             }}
           >
             <span>{activeState === "SCENE" ? "TALKING WITH AMIRA" : activeState === "SEX" ? "EROTIC ENCOUNTER" : "OVERWORLD EXPLORATION"}</span>
-            <span className="text-[10px] opacity-70">Scene Active</span>
+            <span className="text-[10px] opacity-70">Lilith's District</span>
           </div>
           <p>
             You explore the cobblestone courtyard of Lilith's District. Arcane street lamps flicker with lavender
-            magical light. Merchants, succubi, and travelers wander the lively avenue.
+            magical light. Use keyboard controls (W, A, S, D) to navigate surrounding streets.
           </p>
-          <div className="space-y-1.5 pt-1">
-            <div className="text-[11px] font-semibold tracking-wide" style={{ color: colorToCss(colors.textGold) }}>
-              STORY CHOICES:
-            </div>
-            {[
-              "[1] Talk to Madame Selene at the apothecary stall",
-              "[2] Follow the hooded stranger down the shadowed alley",
-              "[3] Rest near the fountain to recover vitality",
-            ].map((choice, idx) => (
-              <button
-                key={idx}
-                className="w-full text-left px-3 py-1.5 rounded text-[11px] font-medium border transition shadow-sm bg-black/30 hover:bg-white/10"
-                style={{
-                  borderColor: colorToCss(colors.borderNormal),
-                  color: colorToCss(colors.textPrimary),
-                  borderRadius: radius,
-                }}
-              >
-                {choice}
-              </button>
-            ))}
-          </div>
         </div>
       );
 
@@ -396,9 +374,9 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
       return (
         <div className="w-full grid grid-cols-5 gap-1.5">
           {[
-            "Move North (W)", "Move South (S)", "Move West (A)", "Move East (D)", "Wait / Rest",
-            "Talk to NPC", "Examine Ground", "Inventory (I)", "Visit Shop (K)", "Mutations (M)",
-            "Test Combat (C)", "Cast Spells", "Use Item", "Character Sheet", "Pass Turn",
+            "Talk to NPC", "Examine Ground", "Inventory (I)", "Visit Shop (K)", "Mutations & TF (M)",
+            "Test Combat (C)", "Wait / Rest (1 hr)", "Quests & Journal", "Map Overview", "Cast Spell",
+            "Use Consumable", "Character Stats", "QuickSave (F5)", "QuickLoad (F9)", "Pass Turn",
           ].map((cmd, idx) => (
             <button
               key={idx}
