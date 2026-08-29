@@ -8,7 +8,8 @@ export type GameSimulationState =
   | "MAIN_MENU"
   | "SETTINGS"
   | "TRANSFORMATION"
-  | "SHOP";
+  | "SHOP"
+  | "ENCHANTING";
 
 export type ContainerDirection = "ROW" | "COLUMN";
 
@@ -57,44 +58,48 @@ export const BLANK_LAYOUT: LayoutFile = {
     SETTINGS: { enabled: false, rootNode: { id: "box_settings", type: "LEAF", widgets: [] } },
     TRANSFORMATION: { enabled: false, rootNode: { id: "box_tf", type: "LEAF", widgets: [] } },
     SHOP: { enabled: false, rootNode: { id: "box_shop", type: "LEAF", widgets: [] } },
+    ENCHANTING: { enabled: false, rootNode: { id: "box_ench", type: "LEAF", widgets: [] } },
   },
 };
 
 /**
- * Default Populated Lilith textRPG Preset
+ * Default Populated Lilith's Throne 3-Column Preset
  */
 export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
   layoutName: "Lilith's Throne Complete Master Layout",
   margin: 6.0,
   rootNode: {
-    id: "root_column",
+    id: "root_row",
     type: "CONTAINER",
-    direction: "COLUMN",
-    sizes: [6.0, 72.0, 22.0],
+    direction: "ROW",
+    sizes: [20.0, 60.0, 20.0],
     children: [
       {
-        id: "top_bar_box",
-        type: "LEAF",
-        name: "Top Status Bar",
-        widgets: ["widget_top_bar_full"],
-      },
-      {
-        id: "middle_row_container",
+        id: "left_column",
         type: "CONTAINER",
-        direction: "ROW",
-        sizes: [22.0, 56.0, 22.0],
+        direction: "COLUMN",
+        sizes: [48.0, 52.0],
         children: [
           {
-            id: "left_sidebar_box",
+            id: "left_char_card_box",
             type: "LEAF",
             name: "Character Bio & Vitals",
-            widgets: [
-              "widget_char_overview",
-              "widget_vitals_gauges",
-              "widget_attributes_table",
-              "widget_anatomy_fluids",
-            ],
+            widgets: ["widget_lt_character_card"],
           },
+          {
+            id: "left_dpad_box",
+            type: "LEAF",
+            name: "Radar & Navigation Toolstrip",
+            widgets: ["widget_lt_dpad_radar"],
+          },
+        ],
+      },
+      {
+        id: "center_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [78.0, 22.0],
+        children: [
           {
             id: "center_narrative_box",
             type: "LEAF",
@@ -102,21 +107,38 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
             widgets: ["widget_narrative_story"],
           },
           {
-            id: "right_sidebar_box",
+            id: "bottom_actions_box",
             type: "LEAF",
-            name: "World Radar & Target",
-            widgets: [
-              "widget_minimap_radar",
-              "widget_target_inspector",
-            ],
+            name: "Action Commands Grid",
+            widgets: ["widget_action_commands"],
           },
         ],
       },
       {
-        id: "bottom_actions_box",
-        type: "LEAF",
-        name: "Action Commands Grid",
-        widgets: ["widget_action_commands"],
+        id: "right_column",
+        type: "CONTAINER",
+        direction: "COLUMN",
+        sizes: [25.0, 30.0, 45.0],
+        children: [
+          {
+            id: "right_chars_box",
+            type: "LEAF",
+            name: "Characters Present",
+            widgets: ["widget_lt_characters_present"],
+          },
+          {
+            id: "right_items_box",
+            type: "LEAF",
+            name: "Items Present",
+            widgets: ["widget_lt_items_present"],
+          },
+          {
+            id: "right_log_box",
+            type: "LEAF",
+            name: "Event & Activity Log",
+            widgets: ["widget_lt_event_log"],
+          },
+        ],
       },
     ],
   },
@@ -458,6 +480,83 @@ export const PRESET_DEFAULT_POPULATED_LAYOUT: LayoutFile = {
             type: "LEAF",
             name: "Menu Actions",
             widgets: ["widget_action_commands"],
+          },
+        ],
+      },
+    },
+    ENCHANTING: {
+      enabled: true,
+      rootNode: {
+        id: "ench_root_row",
+        type: "CONTAINER",
+        direction: "ROW",
+        sizes: [20.0, 60.0, 20.0],
+        children: [
+          {
+            id: "ench_left_column",
+            type: "CONTAINER",
+            direction: "COLUMN",
+            sizes: [48.0, 52.0],
+            children: [
+              {
+                id: "ench_left_card",
+                type: "LEAF",
+                name: "Character Vitals",
+                widgets: ["widget_lt_character_card"],
+              },
+              {
+                id: "ench_left_paperdoll",
+                type: "LEAF",
+                name: "Paperdoll Gear",
+                widgets: ["widget_paperdoll_equipment"],
+              },
+            ],
+          },
+          {
+            id: "ench_center_column",
+            type: "CONTAINER",
+            direction: "COLUMN",
+            sizes: [78.0, 22.0],
+            children: [
+              {
+                id: "ench_center_altar",
+                type: "LEAF",
+                name: "Enchanting Altar",
+                widgets: ["widget_lt_enchanting_screen"],
+              },
+              {
+                id: "ench_bottom_actions",
+                type: "LEAF",
+                name: "Action Commands",
+                widgets: ["widget_action_commands"],
+              },
+            ],
+          },
+          {
+            id: "ench_right_column",
+            type: "CONTAINER",
+            direction: "COLUMN",
+            sizes: [25.0, 30.0, 45.0],
+            children: [
+              {
+                id: "ench_right_chars",
+                type: "LEAF",
+                name: "Characters Present",
+                widgets: ["widget_lt_characters_present"],
+              },
+              {
+                id: "ench_right_items",
+                type: "LEAF",
+                name: "Items Present",
+                widgets: ["widget_lt_items_present"],
+              },
+              {
+                id: "ench_right_log",
+                type: "LEAF",
+                name: "Event Log",
+                widgets: ["widget_lt_event_log"],
+              },
+            ],
           },
         ],
       },

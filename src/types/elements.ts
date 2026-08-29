@@ -12,6 +12,7 @@ export type AtomicElementType =
   | "ITEM_DETAILS_INSPECTOR"
   | "INVENTORY_FILTER_TABS"
   | "MINIMAP_RADAR"
+  | "MINIMAP_DPAD_RADAR"
   | "TARGET_INSPECTOR"
   | "CYOA_STORY_VIEW"
   | "CYOA_SEX_LOG"
@@ -24,6 +25,12 @@ export type AtomicElementType =
   | "ACTION_COMMANDS_GRID"
   | "TIME_DATE_BANNER"
   | "CURRENCY_GOLD_COUNTER"
+  | "ARCANE_ESSENCE_COUNTER"
+  | "STATUS_EFFECTS_ROW"
+  | "BOTTOM_TOOLSTRIP"
+  | "CHARACTERS_PRESENT_LIST"
+  | "ITEMS_PRESENT_LIST"
+  | "EVENT_LOG_STREAM"
   | "LOCATION_MAP_BADGE"
   | "MAIN_MENU_HERO"
   | "MAIN_MENU_ACTIONS"
@@ -34,6 +41,10 @@ export type AtomicElementType =
   | "BODY_MUTATIONS_TREE"
   | "ACTIVE_ENCHANTMENTS_LIST"
   | "ENCHANTING_ALTAR_GRID"
+  | "ENCHANTING_PRIMARY_MODIFIERS"
+  | "ENCHANTING_SECONDARY_MODIFIERS"
+  | "ENCHANTING_STRENGTH_SELECTOR"
+  | "ENCHANTING_RECIPE_CONTAINER"
   | "MERCHANT_PORTRAIT_DIALOG"
   | "MERCHANT_SHOP_CATALOG"
   | "PLAYER_SELL_GRID"
@@ -357,5 +368,82 @@ export const PREMADE_WIDGETS: CustomWidgetDefinition[] = [
     gap: 6,
     padding: 8,
     elements: [{ id: "e_shop_cart", type: "TRANSACTION_CART_SUMMARY" }],
+  },
+  {
+    id: "widget_lt_character_card",
+    name: "Character Status Card (Lilith's Style)",
+    description: "Avatar, Name, Level, Gold & Essence, 3 Progress Bars, and Status Trait Badges",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [
+      { id: "e_lt_name", type: "PLAYER_NAME" },
+      { id: "e_lt_gold", type: "CURRENCY_GOLD_COUNTER" },
+      { id: "e_lt_essence", type: "ARCANE_ESSENCE_COUNTER" },
+      { id: "e_lt_hp", type: "HEALTH_BAR" },
+      { id: "e_lt_mp", type: "MANA_BAR" },
+      { id: "e_lt_lust", type: "LUST_BAR" },
+      { id: "e_lt_badges", type: "STATUS_EFFECTS_ROW" },
+    ],
+  },
+  {
+    id: "widget_lt_dpad_radar",
+    name: "Compass D-Pad & Toolstrip (Lilith's Style)",
+    description: "Calendar time/date, directional D-Pad navigation cross, and bottom utility toolbar",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 6,
+    padding: 8,
+    elements: [
+      { id: "e_lt_time", type: "TIME_DATE_BANNER" },
+      { id: "e_lt_dpad", type: "MINIMAP_DPAD_RADAR" },
+      { id: "e_lt_toolstrip", type: "BOTTOM_TOOLSTRIP" },
+    ],
+  },
+  {
+    id: "widget_lt_enchanting_screen",
+    name: "Enchanting Altar (Lilith's Style)",
+    description: "Primary & secondary modifier icon grids, strength selectors, and item recipe container",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 8,
+    padding: 10,
+    elements: [
+      { id: "e_lt_prim", type: "ENCHANTING_PRIMARY_MODIFIERS" },
+      { id: "e_lt_sec", type: "ENCHANTING_SECONDARY_MODIFIERS" },
+      { id: "e_lt_str", type: "ENCHANTING_STRENGTH_SELECTOR" },
+      { id: "e_lt_recipe", type: "ENCHANTING_RECIPE_CONTAINER" },
+    ],
+  },
+  {
+    id: "widget_lt_characters_present",
+    name: "Characters Present Panel",
+    description: "List of NPCs and companions on current tile with avatar badges",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 4,
+    padding: 6,
+    elements: [{ id: "e_lt_chars", type: "CHARACTERS_PRESENT_LIST" }],
+  },
+  {
+    id: "widget_lt_items_present",
+    name: "Items Present Panel",
+    description: "List of items and ground containers on current tile with quantities",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 4,
+    padding: 6,
+    elements: [{ id: "e_lt_items", type: "ITEMS_PRESENT_LIST" }],
+  },
+  {
+    id: "widget_lt_event_log",
+    name: "Event & Activity Log Stream",
+    description: "Game activity log showing saves, encyclopedia unlocks, and combat rolls",
+    isPremade: true,
+    layoutDirection: "VERTICAL",
+    gap: 4,
+    padding: 6,
+    elements: [{ id: "e_lt_log", type: "EVENT_LOG_STREAM" }],
   },
 ];

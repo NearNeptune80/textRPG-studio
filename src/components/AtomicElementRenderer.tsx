@@ -2,7 +2,16 @@ import React from "react";
 import { AtomicElementConfig } from "../types/elements";
 import { ThemeFile, colorToCss } from "../types/theme";
 import { GameSimulationState } from "../types/layout";
-import { MapPin, Coins } from "lucide-react";
+import {
+  MapPin,
+  Coins,
+  Sparkles,
+  Settings,
+  BookOpen,
+  Shirt,
+  ShoppingBag,
+  Compass,
+} from "lucide-react";
 
 interface AtomicElementRendererProps {
   element: AtomicElementConfig;
@@ -22,16 +31,266 @@ export const AtomicElementRenderer: React.FC<AtomicElementRendererProps> = ({
   switch (element.type) {
     case "TIME_DATE_BANNER":
       return (
-        <div className="text-[11px]" style={{ color: colorToCss(colors.textSecondary) }}>
-          08:30 AM | Day 1, Early Morning
+        <div className="text-[11px] font-medium" style={{ color: colorToCss(colors.textSecondary) }}>
+          📅 24th October • 19:08
         </div>
       );
 
     case "CURRENCY_GOLD_COUNTER":
       return (
         <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: colorToCss(colors.currency) }}>
-          <Coins className="w-3.5 h-3.5" /> 150¤
+          <Coins className="w-3.5 h-3.5" /> 5,000¤
         </span>
+      );
+
+    case "ARCANE_ESSENCE_COUNTER":
+      return (
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-pink-400">
+          <Sparkles className="w-3.5 h-3.5" /> 89
+        </span>
+      );
+
+    case "STATUS_EFFECTS_ROW":
+      return (
+        <div className="flex items-center gap-1.5 pt-1">
+          {["⚡", "🌧️", "♀️", "🎀", "✨"].map((icon, idx) => (
+            <div
+              key={idx}
+              className="w-5 h-5 rounded-full bg-black/40 border border-white/20 flex items-center justify-center text-[10px] shadow"
+              title={`Status Trait ${idx + 1}`}
+            >
+              {icon}
+            </div>
+          ))}
+        </div>
+      );
+
+    case "MINIMAP_DPAD_RADAR":
+      return (
+        <div className="w-full flex flex-col items-center justify-center p-2 bg-black/40 border border-white/10 rounded my-1" style={{ borderRadius: radius }}>
+          <div className="grid grid-cols-3 gap-1 w-24 h-24">
+            <div />
+            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">W</button>
+            <div />
+            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">A</button>
+            <div className="bg-pink-600/30 border border-pink-500/50 rounded flex items-center justify-center text-[10px] font-bold text-pink-300 shadow">📍</div>
+            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">D</button>
+            <div />
+            <button className="bg-white/5 hover:bg-white/20 border border-white/10 rounded flex items-center justify-center text-[10px] font-bold text-slate-300">S</button>
+            <div />
+          </div>
+        </div>
+      );
+
+    case "BOTTOM_TOOLSTRIP":
+      return (
+        <div className="w-full flex items-center justify-between pt-1 border-t border-white/10">
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Options / Settings">
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Journal / Encyclopedia">
+            <BookOpen className="w-3.5 h-3.5" />
+          </button>
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Wardrobe / Clothing">
+            <Shirt className="w-3.5 h-3.5" />
+          </button>
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="Inventory / Backpack">
+            <ShoppingBag className="w-3.5 h-3.5" />
+          </button>
+          <button className="p-1.5 hover:bg-white/10 rounded text-slate-400 hover:text-white transition" title="World Map">
+            <Compass className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+
+    case "CHARACTERS_PRESENT_LIST":
+      return (
+        <div className="w-full space-y-1.5 text-xs">
+          <div className="font-bold text-[11px] uppercase tracking-wider text-slate-300">
+            Characters Present
+          </div>
+          {[
+            { name: "Rose", icon: "🐱", color: "text-pink-300" },
+            { name: "Lilaya", icon: "👩", color: "text-purple-300" },
+          ].map((c, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-2 p-1.5 bg-black/30 border border-white/5 rounded text-xs"
+              style={{ borderRadius: radius }}
+            >
+              <span className="w-5 h-5 rounded-full bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-[10px]">
+                {c.icon}
+              </span>
+              <span className={`font-semibold ${c.color}`}>{c.name}</span>
+            </div>
+          ))}
+        </div>
+      );
+
+    case "ITEMS_PRESENT_LIST":
+      return (
+        <div className="w-full space-y-1 text-xs">
+          <div className="font-bold text-[11px] uppercase tracking-wider text-slate-300">
+            Items Present
+          </div>
+          <div className="space-y-0.5 text-[11px]">
+            <div className="text-amber-200">1x gold anklet</div>
+            <div className="text-cyan-300">1x burgundy gothic heels</div>
+            <div className="text-purple-300">1x black spreader bar</div>
+            <div className="text-pink-300">1x black safety goggles</div>
+            <div className="text-slate-300">1x grey crotchless thong</div>
+          </div>
+        </div>
+      );
+
+    case "EVENT_LOG_STREAM":
+      return (
+        <div className="w-full space-y-1 text-[10px] font-mono leading-tight">
+          <div className="font-bold text-[11px] font-sans uppercase tracking-wider text-slate-300 mb-1">
+            Event Log
+          </div>
+          <div className="text-emerald-400">Game loaded: QuickSave_Lauren.xml</div>
+          <div className="text-amber-300">Encyclopedia: Wolf-morph</div>
+          <div className="text-purple-300">Item Added: Impish Brew</div>
+          <div className="text-cyan-300">Item Added: Bunny Juice</div>
+          <div className="text-pink-300">Encyclopedia: Gothic boots</div>
+        </div>
+      );
+
+    case "ENCHANTING_PRIMARY_MODIFIERS":
+      return (
+        <div className="w-full space-y-2">
+          <div className="text-[11px] font-bold tracking-wide uppercase text-purple-300">
+            Primary Modifier (Body Part / Target)
+          </div>
+          <div className="grid grid-cols-8 gap-1.5">
+            {["🟣", "🔘", "👁️", "🖐️", "👂", "👅", "👃", "🍑", "🍈", "🍆", "🌺", "🩸", "💧", "✨", "💫", "🌟"].map(
+              (icon, idx) => (
+                <button
+                  key={idx}
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs transition ${
+                    idx === 0
+                      ? "bg-pink-600 border-pink-300 shadow-md shadow-pink-500/30 scale-110"
+                      : "bg-purple-950/60 border-purple-500/40 hover:border-pink-400"
+                  }`}
+                >
+                  {icon}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      );
+
+    case "ENCHANTING_SECONDARY_MODIFIERS":
+      return (
+        <div className="w-full space-y-2">
+          <div className="text-[11px] font-bold tracking-wide uppercase text-cyan-300">
+            Secondary Modifier (Effect / Element)
+          </div>
+          <div className="grid grid-cols-8 gap-1.5">
+            {["🧪", "💧", "🛡️", "⚔️", "➕", "➖", "⚡", "🔥", "❄️", "🌪️", "🌿", "🌙", "☀️", "🔮", "🧬", "💥"].map(
+              (icon, idx) => (
+                <button
+                  key={idx}
+                  className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs transition ${
+                    idx === 4
+                      ? "bg-emerald-600 border-emerald-300 shadow-md shadow-emerald-500/30 scale-110"
+                      : "bg-teal-950/60 border-teal-500/40 hover:border-teal-400"
+                  }`}
+                >
+                  {icon}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      );
+
+    case "ENCHANTING_STRENGTH_SELECTOR":
+      return (
+        <div className="w-full space-y-2">
+          <div className="flex gap-1.5 overflow-x-auto">
+            {["Major Drain", "Drain", "Minor Drain", "Minor Boost", "Boost", "Major Boost"].map((tier, idx) => (
+              <button
+                key={idx}
+                className={`flex-1 py-1 px-2 rounded text-[10px] font-bold border transition ${
+                  idx === 5
+                    ? "bg-amber-500 text-black border-amber-300 shadow"
+                    : "bg-black/40 text-slate-300 border-white/10 hover:bg-white/10"
+                }`}
+                style={{ borderRadius: radius }}
+              >
+                {tier}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center justify-between p-2 bg-black/40 border border-white/10 rounded" style={{ borderRadius: radius }}>
+            <span className="text-[11px] text-pink-300 font-medium">
+              Effect: <strong className="text-slate-100">Huge increase in milk regeneration</strong>
+            </span>
+            <button className="px-3 py-1 bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold rounded border border-pink-400 shadow flex items-center gap-1">
+              Add | <Sparkles className="w-3 h-3" /> 13
+            </button>
+          </div>
+        </div>
+      );
+
+    case "ENCHANTING_RECIPE_CONTAINER":
+      return (
+        <div className="w-full p-3 bg-black/40 border border-white/10 rounded space-y-2.5" style={{ borderRadius: radius }}>
+          <div className="flex items-start gap-3">
+            {/* Input Slot */}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-bold uppercase text-slate-400">Input</span>
+              <div className="w-14 h-14 rounded-full bg-amber-950/40 border-2 border-amber-500/60 flex items-center justify-center text-xl shadow-inner">
+                🥛
+              </div>
+              <span className="text-[10px] font-mono text-slate-300">x1</span>
+            </div>
+
+            {/* Middle Effects Container */}
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-200">Effects (5/100)</span>
+                <span className="text-[11px] font-bold text-pink-400 flex items-center gap-1">
+                  Cost: <Sparkles className="w-3 h-3" /> 46
+                </span>
+              </div>
+              <input
+                type="text"
+                defaultValue="Bovine elixir"
+                className="w-full px-2 py-1 bg-black/60 border border-white/20 rounded text-xs text-amber-200 font-semibold focus:outline-none focus:border-pink-500"
+                style={{ borderRadius: radius }}
+              />
+              <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                {[
+                  "Bovine tail transformation.",
+                  "Bovine ears transformation.",
+                  "Grows curved horns.",
+                  "Huge increase in breast size. (+3 breast size.)",
+                  "Huge increase in milk storage. (+50ml.)",
+                ].map((eff, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between px-2 py-0.5 bg-black/30 border border-white/5 rounded text-[10px]"
+                  >
+                    <span className="text-slate-300 truncate">{eff}</span>
+                    <button className="text-red-400 hover:text-red-300 font-bold px-1">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Output Slot */}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-bold uppercase text-purple-300">Output</span>
+              <div className="w-14 h-14 rounded-full bg-purple-950/60 border-2 border-purple-400 flex items-center justify-center text-xl shadow-lg shadow-purple-500/20">
+                🔮
+              </div>
+            </div>
+          </div>
+        </div>
       );
 
     case "LOCATION_MAP_BADGE":
